@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "strf.h"
 #include "Tree.h"
 
 #include "c_parser.h"
