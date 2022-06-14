@@ -6,8 +6,8 @@ CFLAGS+=-I. -gstabs
 
 all: libcl.a cparser
 
-cparser: cparser.o libcl.a Tree.o
-	$(CC) $(CFLAGS) -o cparser cparser.o libcl.a Tree.o
+cparser: cparser.o libcl.a Tree.o Symbol.o
+	$(CC) $(CFLAGS) -o cparser cparser.o libcl.a Tree.o Symbol.o
 
 libcl.a: c_lex.nrlex c_parser.rdpp Tree.c
 	$(RDPPGEN) c_parser.rdpp

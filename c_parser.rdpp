@@ -5,6 +5,7 @@
 #include <stdarg.h>
 
 #include "Tree.h"
+#include "Symbol.h"
 
 #include "c_parser.h"
 #include "c_parser.tokens.h"
@@ -34,7 +35,6 @@ void static safe_free(void *ptr)
 }
 
 int default_action(xParser self, xParserType *result, xParserType *terms, int *types, int start, int end, int nt_id)
-//int default_action(xParser self, xParserType *result, xParserType *terms, xParserTypeInfo *infos, int start, int end, int nt_id)
 {
 Tree t;
 int  i;
@@ -44,15 +44,11 @@ int  i;
 	else
 		t = result->t;
 
-//	fprintf(stderr,"Default Action %d %d %p\n", start, end, t);
-
 	if((result->t == NULL) || (result->t != NULL && start>0)){
 		for(i=start; i<end; i++){
 			if(types[i] < RDPP_NONTERMINAL_START){
-//				fprintf(stderr,"Default Action %d token %p %d [%s]\n", i, terms[i].t, types[i], terms[i].str);
 				treeAddChild(t, treeNew(types[i], terms[i].str));
 			}else{
-//				fprintf(stderr,"Default Action %d non-t %p %d []\n", i, terms[i].t, types[i]);
 				treeAddChild(t, terms[i].t);
 			}
 		}
@@ -60,6 +56,8 @@ int  i;
 
 	result->t = t;
 }
+
+static int typedefFlag = 0;
 
 
 %%xParser top x_lex
@@ -316,6 +314,7 @@ constant_expression:
 #	;
 
 declaration:
+	{ typedefFlag = 0; }
 	declaration_specifiers init_declarator_list_opt function_definition_or_declaration_end
 	;
 
@@ -356,14 +355,14 @@ init_declarator_list_lr:
 	;
 
 init_declarator:
-	declarator
+	declarator 
 	#| declarator ASSIGN initializer (for later)
 	;
 
 
 #3.5.1 Storage-class specifiers
 storage_class_specifier:
-	TYPEDEF
+	TYPEDEF { typedefFlag = 1; }
 	| EXTERN
 	| STATIC
 	| AUTO
@@ -542,7 +541,7 @@ declarator:
 ##	;
 
 direct_declarator:
-	IDENTIFIER direct_declarator_lr
+	IDENTIFIER direct_declarator_lr { fprintf(stderr,"IDENT: %s, %d\n", terms[0].str, typedefFlag); }
 	| OP declarator CP direct_declarator_lr
 	;
 

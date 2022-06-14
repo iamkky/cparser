@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include "Symbol.h"
 #include "Tree.h"
 #include "c_parser.h"
 
