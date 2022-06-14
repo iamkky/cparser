@@ -1,0 +1,244 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+#include "Tree.h"
+
+#include "c_parser.h"
+#include "c_parser.tokens.h"
+#include "c_lex.h"
+
+#define TOKENDEBUG 1
+
+// Lex Helper function
+
+static char *getString(char *input, int *cursor, char escape, char closure)
+{
+char *tmp, *newtmp, *p, last;
+int  size, used, count;
+
+	if((p = tmp = malloc(size = 128))==NULL) return NULL;
+	*p = used = count = 0;
+
+	if(*input++!=closure) return tmp;
+
+	while((last = (*p++ = *input++))){
+		count++;
+		if(last==closure){
+			*(p-1)=0;
+			break;
+		}else if(last==escape && *input==closure) {
+			*(p-1)=closure;
+			input++;
+			count++;
+		}
+		if(++used>=size-1) {
+			if((newtmp = realloc(tmp, size = (2 * size)))==NULL) {
+				free(tmp);
+				return NULL;
+			}
+			p = (tmp = newtmp) + count;
+		}
+	}
+
+	(*cursor)+=count;
+	return tmp;
+}
+
+struct keyword {
+	char	*name;
+	int	token;
+};
+
+struct keyword keywords[] = {
+	{"auto",	AUTO},
+	{"double",	DOUBLE},
+	{"int",		INT},
+	{"struct",	STRUCT},
+	{"break",	BREAK},
+	{"else",	ELSE},
+	{"long",	LONG},
+	{"switch",	SWITCH},
+	{"case",	CASE},
+	{"enum",	ENUM},
+	{"register",	REGISTER},
+	{"typedef",	TYPEDEF},
+	{"char",	CHAR},
+	{"extern",	EXTERN},
+	{"return",	RETURN},
+	{"union",	UNION},
+	{"const",	CONST},
+	{"float",	FLOAT},
+	{"short",	SHORT},
+	{"unsigned",	UNSIGNED},
+	{"continue",	CONTINUE},
+	{"for",		FOR},
+	{"signed",	SIGNED},
+	{"void",	VOID},
+	{"default",	DEFAULT},
+	{"goto",	GOTO},
+	{"sizeof",	SIZEOF},
+	{"volatile",	VOLATILE},
+	{"do",		DO},
+	{"if",		IF},
+	{"static",	STATIC},
+	{"while",	WHILE},
+	{NULL,		0}
+};
+
+// Old approch, mistaken "inta;" by "int a;"
+//auto			: value->str = nrDupToken(input,size); return AUTO;
+//double		: value->str = nrDupToken(input,size); return DOUBLE;
+//int			: value->str = nrDupToken(input,size); return INT;
+//struct		: value->str = nrDupToken(input,size); return STRUCT;
+//break			: value->str = nrDupToken(input,size); return BREAK;
+//else			: value->str = nrDupToken(input,size); return ELSE;
+//long			: value->str = nrDupToken(input,size); return LONG;
+//switch		: value->str = nrDupToken(input,size); return SWITCH;
+//case			: value->str = nrDupToken(input,size); return CASE;
+//enum			: value->str = nrDupToken(input,size); return ENUM;
+//register		: value->str = nrDupToken(input,size); return REGISTER;
+//typedef		: value->str = nrDupToken(input,size); return TYPEDEF;
+//char			: value->str = nrDupToken(input,size); return CHAR;
+//extern		: value->str = nrDupToken(input,size); return EXTERN;
+//return		: value->str = nrDupToken(input,size); return RETURN;
+//union			: value->str = nrDupToken(input,size); return UNION;
+//const			: value->str = nrDupToken(input,size); return CONST;
+//float			: value->str = nrDupToken(input,size); return FLOAT;
+//short			: value->str = nrDupToken(input,size); return SHORT;
+//unsigned		: value->str = nrDupToken(input,size); return UNSIGNED;
+//continue		: value->str = nrDupToken(input,size); return CONTINUE;
+//for			: value->str = nrDupToken(input,size); return FOR;
+//signed		: value->str = nrDupToken(input,size); return SIGNED;
+//void			: value->str = nrDupToken(input,size); return VOID;
+//default		: value->str = nrDupToken(input,size); return DEFAULT;
+//goto			: value->str = nrDupToken(input,size); return GOTO;
+//sizeof		: value->str = nrDupToken(input,size); return SIZEOF;
+//volatile		: value->str = nrDupToken(input,size); return VOLATILE;
+//do			: value->str = nrDupToken(input,size); return DO;
+//if			: value->str = nrDupToken(input,size); return IF;
+//static		: value->str = nrDupToken(input,size); return STATIC;
+//while			: value->str = nrDupToken(input,size); return WHILE;
+
+static char *nrDupToken(char *input, int size);
+
+int processIdentifier(xParserType *value, char *input, int size)
+{
+struct keyword *k;
+char	*str;
+
+	str = value->str = nrDupToken(input,size);
+
+	for(k = keywords; k->name; k++){
+		if(strcmp(str, k->name)==0){
+			return k->token;
+		}
+	}
+
+	return IDENTIFIER;
+}
+
+
+%%x_lex xParserType
+
+%define i	A-Za-z_
+%define I	0-9A-Za-z_
+
+%define D	0-9
+%define N	1-9
+%define O	0-7
+%define H	0-9A-Fa-f
+%define	S	+\-
+%define E	eE
+%define F	flFL
+%define L	uUlL
+
+\D\D*\.\D*\E\S\D\D*\F	: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\D\D*\.\D*\E\S\D\D*	: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\.\D*\E\S\D\D*\F	: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\.\D*\E\S\D\D*		: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\D\D*\.\D\F		: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\D\D*\.\D		: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\.\D\D*\F		: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\.\D\D*			: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\.\D\D*\F		: value->str = nrDupToken(input,size); return FLOAT_CONST;
+
+\D\D*f			: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\D\D*F			: value->str = nrDupToken(input,size); return FLOAT_CONST;
+
+0x\H\H*\L		: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0x\H\H*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0X\H\H*\L		: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0X\H\H*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0\O\O*\L		: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0\O\O*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+\N\D*\L			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+\N\D*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+
+'			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST;
+L'			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST;
+
+"			: value->str = getString(input, cursor, '\\', '\"'); return STRING;
+L"			: value->str = getString(input, cursor, '\\', '\"'); return STRING;
+
+\i\I*			: return processIdentifier(value, input, size);
+
+
+sizeof			: value->str = nrDupToken(input,size); return SIZEOF;
+[			: value->str = nrDupToken(input,size); return OB;
+]			: value->str = nrDupToken(input,size); return CB;
+(			: value->str = nrDupToken(input,size); return OP;
+)			: value->str = nrDupToken(input,size); return CP;
+*=			: value->str = nrDupToken(input,size); return ASSIGN_MUL;
+/=			: value->str = nrDupToken(input,size); return ASSIGN_DIV;
+%=			: value->str = nrDupToken(input,size); return ASSIGN_MOD;
++=			: value->str = nrDupToken(input,size); return ASSIGN_ADD;
+-=			: value->str = nrDupToken(input,size); return ASSIGN_SUB;
+<<=			: value->str = nrDupToken(input,size); return ASSIGN_SHFL;
+>>=			: value->str = nrDupToken(input,size); return ASSIGN_SHFR;
+&=			: value->str = nrDupToken(input,size); return ASSIGN_AND;
+^=			: value->str = nrDupToken(input,size); return ASSIGN_NEG;
+|=			: value->str = nrDupToken(input,size); return ASSIGN_OR;
+
+<<			: value->str = nrDupToken(input,size); return SHIFTLEFT;
+>>			: value->str = nrDupToken(input,size); return SHIFTRIGHT;
+<=			: value->str = nrDupToken(input,size); return CMP_LE;
+>=			: value->str = nrDupToken(input,size); return CMP_GE;
+==			: value->str = nrDupToken(input,size); return CMP_EQ;
+!=			: value->str = nrDupToken(input,size); return CMP_NE;
+<			: value->str = nrDupToken(input,size); return CMP_LT;
+>			: value->str = nrDupToken(input,size); return CMP_GT;
+
+->			: value->str = nrDupToken(input,size); return ARROW;
+++			: value->str = nrDupToken(input,size); return INC;
+--			: value->str = nrDupToken(input,size); return DEC;
+&&			: value->str = nrDupToken(input,size); return LOG_AND;
+||			: value->str = nrDupToken(input,size); return LOG_OR;
+*			: value->str = nrDupToken(input,size); return STAR;
++			: value->str = nrDupToken(input,size); return PLUS;
+-			: value->str = nrDupToken(input,size); return MINUS;
+~			: value->str = nrDupToken(input,size); return NEG;
+!			: value->str = nrDupToken(input,size); return LOG_NOT;
+/			: value->str = nrDupToken(input,size); return DIV;
+%			: value->str = nrDupToken(input,size); return MODULE;
+^			: value->str = nrDupToken(input,size); return BIT_EOR;
+&			: value->str = nrDupToken(input,size); return AMPERSAND;
+|			: value->str = nrDupToken(input,size); return BIT_OR;
+?			: value->str = nrDupToken(input,size); return TERNARY;
+\:			: value->str = nrDupToken(input,size); return COLON;
+=			: value->str = nrDupToken(input,size); return ASSIGN;
+,			: value->str = nrDupToken(input,size); return COMMA;
+
+{			: value->str = nrDupToken(input,size); return OBLOCK;
+}			: value->str = nrDupToken(input,size); return CBLOCK;
+;			: value->str = nrDupToken(input,size); return SEMICOLON;
+\.\.\.			: value->str = nrDupToken(input,size); return ELLIPSIS;
+\.			: value->str = nrDupToken(input,size); return DOT;
+
+
+
+\s			: 
+\n			: 
+\t			: 
+\r			: 
