@@ -11,9 +11,9 @@
 #include "c_parser.tokens.h"
 #include "c_lex.h"
 
-//#define DDEBUG 1
-//#define TOKENDEBUG 1
-//#define RETURNDEBUG 1
+#define DDEBUG 1
+#define TOKENDEBUG 1
+#define RETURNDEBUG 1
 
 struct cparser_extra{
         SymbolTable     syms;
@@ -121,12 +121,7 @@ argument_expression_list_opt:
 	;
 
 argument_expression_list:
-	assignment_expression argument_expression_list_lr
-	;
-
-argument_expression_list_lr:
-	COMMA assignment_expression argument_expression_list_lr
-	|
+	assignment_expression [ COMMA assignment_expression ]
 	;
 
 # 3.3.3 Unary operators
@@ -252,7 +247,6 @@ conditional_expression_disambiguation:
 #	assignment-operator: one of   (for later)
 #	=  *=  /=  %=  +=  -=  <<=  >>=  &=  ^=  |=   (for later)
 #
-#
 #	condition_expression can reduce to an unary_expression
 #	this ruleset has to rules that start with same TERMINAL.
 #	A solution is to change unary_expression to condition_expression 
@@ -265,7 +259,7 @@ conditional_expression_disambiguation:
 #	;
 
 assignment_expression:
-	conditional_expression assignment_expression_disambiguation
+	conditional_expression [ assignment_operator conditional_expression ]
 	;
 
 assignment_expression_disambiguation:
@@ -292,12 +286,7 @@ expression_opt:
 	;
 
 expression:
-	assignment_expression expression_lr
-	;
-
-expression_lr:
-	COMMA assignment_expression expression_lr
-	|
+	assignment_expression [ COMMA assignment_expression ]
 	;
 
 #3.4 CONSTANT EXPRESSIONS *****
@@ -350,12 +339,7 @@ init_declarator_list_opt:
 ##	;
 
 init_declarator_list:
-	init_declarator init_declarator_list_lr
-	;
-
-init_declarator_list_lr:
-	COMMA init_declarator init_declarator_list_lr
-	|
+	init_declarator [ COMMA init_declarator ]
 	;
 
 init_declarator:
@@ -421,12 +405,7 @@ struct_or_union:
 ##	;
 
 struct_declaration_list:
-	struct_declaration struct_declaration_list_lr
-	;
-
-struct_declaration_list_lr:
-	struct_declaration struct_declaration_list_lr
-	|
+	struct_declaration [ struct_declaration ]
 	;
 
 struct_declaration:
@@ -449,12 +428,7 @@ specifier_qualifier_list:
 ##	;
 
 struct_declarator_list:
-	struct_declarator struct_declarator_list_lr
-	;
-
-struct_declarator_list_lr:
-	COMMA struct_declarator struct_declarator_list_lr
-	|
+	struct_declarator [ COMMA struct_declarator ]
 	;
 
 ##struct_declarator:
@@ -499,12 +473,7 @@ enum_specifier_disambiguation2:
 #	;
 
 enumerator_list:
-	enumerator enumerator_list_lr
-	;
-
-enumerator_list_lr:
-	COMMA enumerator enumerator_list_lr
-	|
+	enumerator [ COMMA enumerator ]
 	;
 
 #enumerator:
@@ -560,7 +529,7 @@ direct_declarator_lr:
 	#| OP parameter_type_list CP direct_declarator_lr
 	| OP parameter_type_list_opt CP direct_declarator_lr
 
-	# I Suppose next production it's for K&R style - will not support by now
+	# I Suppose next production is for K&R style - will not support by now
 	# to avoid the need for disambiguation
 	#| OP identifier_list_opt CP direct_declarator_lr (for later)
 	|
@@ -591,8 +560,7 @@ type_qualifier_list_opt:
 ##	;
 
 type_qualifier_list:
-	type_qualifier
-	| type_qualifier type_qualifier_list
+	type_qualifier [ type_qualifier ]
 	;
 
 parameter_type_list_opt:
@@ -601,9 +569,11 @@ parameter_type_list_opt:
 	;
 
 parameter_type_list:
-	parameter_list parameter_type_list_disambiguation
+	parameter_list 
+	#parameter_type_list_disambiguation
 	;
 
+# Will not accept ELLIPSIS here
 parameter_type_list_disambiguation:
 	COMMA ELLIPSIS
 	|
@@ -615,16 +585,13 @@ parameter_type_list_disambiguation:
 ##	;
 
 parameter_list:
-	parameter_declaration parameter_list_lr
-	;
-
-parameter_list_lr:
-	COMMA parameter_declaration
-	|
+	parameter_declaration [ COMMA parameter_declaration ]
 	;
 
 parameter_declaration:
 	declaration_specifiers parameter_declaration_disambiguation
+	# Accepting ELLIPSIS here by now
+	| ELLIPSIS
 	;
 
 parameter_declaration_disambiguation:
@@ -655,7 +622,6 @@ parameter_declaration_disambiguation:
 ##	|
 ##	;
 ##
-
 
 #3.5.5 Type names
 
@@ -705,8 +671,8 @@ labeled_statement:
 	# 
 	#IDENTIFIER COLON  statement
 	#| CASE  constant_expression COLON  statement
-	CASE  constant_expression COLON  statement
-	| DEFAULT COLON  statement
+	CASE constant_expression COLON statement
+	| DEFAULT COLON statement
 	;
 
 
@@ -735,7 +701,7 @@ compound_statement:
 	;
 
 declaration_list:
-	declaration declaration_list
+	declaration [ declaration ]
 	|
 	;
 
@@ -769,8 +735,13 @@ expression_statement:
 #	;
 
 selection_statement:
-	IF OP expression CP  statement [ ELSE  statement ]
+	IF OP expression CP statement selection_statement_disambiguation
 	| SWITCH OP expression CP statement
+	;
+
+selection_statement_disambiguation:
+	ELSE statement
+	|
 	;
 
 # 3.6.5 Iteration statements
