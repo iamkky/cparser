@@ -34,26 +34,36 @@ char *buffer, *tmp;
 	return buffer;
 }
 
+struct cparser_extra{
+	SymbolTable	syms;
+};
+
+
 int main(int argc, char **argv)
 {
 //CxValue  json;
 xParser x;
 char *buffer;
 int bytes, result;
-int lcount;
+struct cparser_extra extra;
 
 	//bytes = read(0, buffer, 32767);
 	buffer = readToBuffer(0, 32768, 1, &bytes);
 	buffer[bytes] = 0;
 
-	x = xParserNew(buffer, &lcount);	
+	extra.syms = symbolTableNew(100);
+	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
 
-	lcount = 0;
+	x = xParserNew(buffer, (void *)&extra);	
+
 	result = xParserParse(x);
 
 	fprintf(stdout,"Input Size: %d\n", bytes);
 	fprintf(stdout,"cursor: %d\n", x->cursor);
 	fprintf(stdout,"Last Token: %d\n", x->currToken);
+	fprintf(stdout,"\n");
+	fprintf(stdout,"Symbol Table:\n");
+	symbolTablePrint(extra.syms, stdout);
 
 	if(result>0){
 		fprintf(stderr,"Success to parse line\n\n");
@@ -88,7 +98,7 @@ int lcount;
 		jsonValueFree(json);
 		*/
 	}else{
-		fprintf(stderr,"Failed to parse line %d\n", lcount);
+		fprintf(stderr,"Failed to parse!\n");
 	}
 	
 

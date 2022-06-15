@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 
+#include "Symbol.h"
 #include "Tree.h"
 
 #include "c_parser.h"
@@ -11,7 +12,12 @@
 
 #define TOKENDEBUG 1
 
+struct cparser_extra{
+	SymbolTable	syms;
+};
+
 // Lex Helper function
+static char *nrDupToken(char *input, int size);
 
 static char *getString(char *input, int *cursor, char escape, char closure)
 {
@@ -87,6 +93,30 @@ struct keyword keywords[] = {
 	{NULL,		0}
 };
 
+int processIdentifier(xParserType *value, char *input, int size, void *extra)
+{
+struct keyword *k;
+char	*str;
+int	isTypedef;
+
+	str = value->str = nrDupToken(input,size);
+
+	for(k = keywords; k->name; k++){
+		if(strcmp(str, k->name)==0){
+			return k->token;
+		}
+	}
+	
+	fprintf(stderr,"XX: %s\n", str);
+	if(isTypedef = symbolTableGetType(((struct cparser_extra *)extra)->syms, str)){
+		fprintf(stderr,"Typedef detected: %s\n", str);
+		return TYPEDEF_NAME;
+	}
+
+	fprintf(stderr,"Identifier detected: %s\n", str);
+	return IDENTIFIER;
+}
+
 // Old approch, mistaken "inta;" by "int a;"
 //auto			: value->str = nrDupToken(input,size); return AUTO;
 //double		: value->str = nrDupToken(input,size); return DOUBLE;
@@ -120,24 +150,6 @@ struct keyword keywords[] = {
 //if			: value->str = nrDupToken(input,size); return IF;
 //static		: value->str = nrDupToken(input,size); return STATIC;
 //while			: value->str = nrDupToken(input,size); return WHILE;
-
-static char *nrDupToken(char *input, int size);
-
-int processIdentifier(xParserType *value, char *input, int size)
-{
-struct keyword *k;
-char	*str;
-
-	str = value->str = nrDupToken(input,size);
-
-	for(k = keywords; k->name; k++){
-		if(strcmp(str, k->name)==0){
-			return k->token;
-		}
-	}
-
-	return IDENTIFIER;
-}
 
 
 %%x_lex xParserType
@@ -182,8 +194,7 @@ L'			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST
 "			: value->str = getString(input, cursor, '\\', '\"'); return STRING;
 L"			: value->str = getString(input, cursor, '\\', '\"'); return STRING;
 
-\i\I*			: return processIdentifier(value, input, size);
-
+\i\I*			: return processIdentifier(value, input, size, extra);
 
 sizeof			: value->str = nrDupToken(input,size); return SIZEOF;
 [			: value->str = nrDupToken(input,size); return OB;
@@ -236,9 +247,8 @@ sizeof			: value->str = nrDupToken(input,size); return SIZEOF;
 \.\.\.			: value->str = nrDupToken(input,size); return ELLIPSIS;
 \.			: value->str = nrDupToken(input,size); return DOT;
 
-
-
 \s			: 
 \n			: 
 \t			: 
 \r			: 
+

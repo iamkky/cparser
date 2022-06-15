@@ -15,6 +15,10 @@
 //#define TOKENDEBUG 1
 //#define RETURNDEBUG 1
 
+struct cparser_extra{
+        SymbolTable     syms;
+};
+
 #define _ddebug_printf _ddprintf
 
 static int _ddprintf(char *fmt, ...)
@@ -527,7 +531,6 @@ type_qualifier:
 				  
 
 #3.5.4 Declarators
-
 declarator:
 	pointer_opt direct_declarator
 	;
@@ -541,7 +544,12 @@ declarator:
 ##	;
 
 direct_declarator:
-	IDENTIFIER direct_declarator_lr { fprintf(stderr,"IDENT: %s, %d\n", terms[0].str, typedefFlag); }
+	IDENTIFIER direct_declarator_lr { 
+			fprintf(stderr,"IDENT: %s, %d\n", terms[0].str, typedefFlag);
+			if(typedefFlag){
+				symbolTableRegister(((struct cparser_extra *)(self->extra))->syms, terms[0].str, 1);
+			}
+		}
 	| OP declarator CP direct_declarator_lr
 	;
 

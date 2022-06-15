@@ -20,7 +20,7 @@ enum types {TYPEDEFNAME=1, TYPEOTHER};
 SymbolTable symbolTableNew(int size);
 
 int symbolTableRegister(SymbolTable table, char *name, int type);
-int symbolTableGet(SymbolTable table, char *name);
-int symbolTablePrint(SymbolTable table);
+int symbolTableGetType(SymbolTable table, char *name);
+int symbolTablePrint(SymbolTable table, FILE *fp);
 
 #endif

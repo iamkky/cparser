@@ -26,23 +26,23 @@ int symbolTableRegister(SymbolTable self, char *name, int type)
 	self->size++;
 }
 
-int symbolTableGet(SymbolTable self, char *name)
+int symbolTableGetType(SymbolTable self, char *name)
 {
 int c;
 
 	for(c=0; c<self->size; c++){
-		if(strcmp(name, self->s[c].name)==0) return c;
+		if(strcmp(name, self->s[c].name)==0) return self->s[c].type;
 	}
 	
-	return -1;
+	return 0;
 }
 
-int symbolTablePrint(SymbolTable self)
+int symbolTablePrint(SymbolTable self, FILE *fp)
 {
 int c;
 
 	for(c=0; c<self->size; c++){
-		fprintf(stderr,"Symbol: %s type: %d\n", self->s[c].name, self->s[c].type);
+		fprintf(fp, "Symbol: %s type: %d\n", self->s[c].name, self->s[c].type);
 	}
 	
 	return 1;
