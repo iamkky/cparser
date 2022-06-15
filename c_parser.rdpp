@@ -11,9 +11,9 @@
 #include "c_parser.tokens.h"
 #include "c_lex.h"
 
-#define DDEBUG 1
-#define TOKENDEBUG 1
-#define RETURNDEBUG 1
+//#define DDEBUG 1
+//#define TOKENDEBUG 1
+//#define RETURNDEBUG 1
 
 struct cparser_extra{
         SymbolTable     syms;
