@@ -187,6 +187,8 @@ int	isTypedef;
 0\O\O*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
 \N\D*\L			: value->str = nrDupToken(input,size); return INTEGER_CONST;
 \N\D*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+
 
 '			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST;
 L'			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST;

@@ -50,8 +50,8 @@ struct cparser_extra extra;
 	//bytes = read(0, buffer, 32767);
 	buffer = readToBuffer(0, 32768, 1, &bytes);
 	buffer[bytes] = 0;
-
-	extra.syms = symbolTableNew(100);
+	
+	extra.syms = symbolTableNew(200);
 	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
 
 	x = xParserNew(buffer, (void *)&extra);	

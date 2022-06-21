@@ -6,7 +6,7 @@ typedef struct tree *Tree;
 struct tree{
 	int	type;
 	char	*value;
-	Tree	child[128];
+	Tree	child[256];
 	int	n_child;
 };
 

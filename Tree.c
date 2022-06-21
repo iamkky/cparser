@@ -23,7 +23,7 @@ int i;
 	t->value = value ? strdup(value) : NULL;
 	t->n_child = 0;
 
-	for(i=0; i<128; i++){
+	for(i=0; i<256; i++){
 		t->child[i] = NULL;
 	}
 
@@ -38,14 +38,12 @@ int i;
 		fprintf(stderr,"treeAddChild: Null exception\n");
 		return -1;
 	}
-	if(t->n_child>=128){
+	if(t->n_child>=256){
 		fprintf(stderr,"Tree child vector overflow\n");
 		return -1;
 	}
-	if(t->n_child<128){
-		t->child[t->n_child] = child;
-		t->n_child++;
-	}
+	t->child[t->n_child] = child;
+	t->n_child++;
 	return 0;
 }
 

@@ -15,7 +15,7 @@ struct symbolTable {
 	int	allocated;
 };
 
-enum types {TYPEDEFNAME=1, TYPEOTHER};
+enum types {TYPEOTHER=0, TYPEDEFNAME=1};
 
 SymbolTable symbolTableNew(int size);
 

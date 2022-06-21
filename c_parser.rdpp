@@ -11,9 +11,9 @@
 #include "c_parser.tokens.h"
 #include "c_lex.h"
 
-//#define DDEBUG 1
-//#define TOKENDEBUG 1
-//#define RETURNDEBUG 1
+#define DDEBUG 1
+#define TOKENDEBUG 1
+#define RETURNDEBUG 1
 
 struct cparser_extra{
         SymbolTable     syms;
@@ -43,6 +43,9 @@ int default_action(xParser self, xParserType *result, xParserType *terms, int *t
 Tree t;
 int  i;
 
+	if(self->valueSp>500){
+		fprintf(stderr,"Stack: %d\n", self->valueSp);
+	}
 	if(result->t==NULL)
 		t = treeNew(nt_id, "nt");
 	else
@@ -65,9 +68,10 @@ static int typedefFlag = 0;
 
 
 %%xParser top x_lex
-union {
+struct {
 	Tree	t;
 	char	*str;
+	int	st_class;
 }
 %%
 
@@ -97,7 +101,7 @@ primary_expression:
 	IDENTIFIER
 	| constant
 	| STRING
-	| OP  expression CP
+	| OP expression CP
 	;
 
 # 3.3.2 Postfix operators
@@ -130,8 +134,12 @@ unary_expression:
 	| INC unary_expression
 	| DEV unary_expression
 	| unary_operator cast_expression
-	| SIZEOF  unary_expression
-	| SIZEOF OP type_name CP
+	| SIZEOF unary_expression_disambiguation
+	;
+
+unary_expression_disambiguation:
+	OP type_name CP
+	| unary_expression
 	;
 
 unary_operator:
@@ -144,9 +152,28 @@ unary_operator:
 	;
 
 # 3.3.4 Cast operators
+#
+# first(OP type_name CP cast_expression) includes '('
+# first(unary_expression) also includes '('
+#
+# bacause:
+#    first(unary_expression) = { first(postfix_expression), INC, DEC, unary_operator, SIZEOF }
+#    first(postfix_expression) = first(primary_expression)
+#    first(primary_expression) = { first(id), first(constant), first(STRING), '(' }
+#
+#cast_expression:
+#	OP type_name CP cast_expression
+#	| unary_expression
+#	;
+#
 cast_expression:
-	unary_expression
-	| OP type_name CP cast_expression
+	OP cast_expression_disambiguation
+	| unary_expression
+	;
+
+cast_expression_disambiguation:
+	type_name CP cast_expression
+	| expression CP
 	;
 
 # 3.3.5 Multiplicative operators
@@ -307,8 +334,9 @@ constant_expression:
 #	;
 
 declaration:
-	{ typedefFlag = 0; }
-	declaration_specifiers init_declarator_list_opt function_definition_or_declaration_end
+	{typedefFlag = 0;}
+	declaration_specifiers { if(terms[0].st_class==TYPEDEFNAME) typedefFlag = 1; else typedefFlag = 0; }
+		init_declarator_list_opt function_definition_or_declaration_end
 	;
 
 function_definition_or_declaration_end:
@@ -318,14 +346,14 @@ function_definition_or_declaration_end:
 	;
 
 declaration_specifiers:
-	storage_class_specifier declaration_specifiers_opt
-	| type_specifier declaration_specifiers_opt
-	| type_qualifier declaration_specifiers_opt
+	storage_class_specifier declaration_specifiers_opt { result.st_class = terms[0].st_class | terms[1].st_class; }
+	| type_specifier declaration_specifiers_opt        { result.st_class = terms[1].st_class; }
+	| type_qualifier declaration_specifiers_opt        { result.st_class = terms[1].st_class; }
 	;
 
 declaration_specifiers_opt:
-	declaration_specifiers
-	|
+	declaration_specifiers { result.st_class = terms[0].st_class; }
+	|			
 	;
 
 init_declarator_list_opt:
@@ -350,7 +378,7 @@ init_declarator:
 
 #3.5.1 Storage-class specifiers
 storage_class_specifier:
-	TYPEDEF { typedefFlag = 1; }
+	TYPEDEF { result.st_class = TYPEDEFNAME; }
 	| EXTERN
 	| STATIC
 	| AUTO
@@ -408,8 +436,12 @@ struct_declaration_list:
 	struct_declaration [ struct_declaration ]
 	;
 
+#  struct_declarator_list_opt introduced to be
+#  compatible with C1X unamed structure/union member
+#
+
 struct_declaration:
-	specifier_qualifier_list struct_declarator_list SEMICOLON
+	specifier_qualifier_list struct_declarator_list_opt SEMICOLON
 	;
 
 specifier_qualifier_list_opt:
@@ -420,6 +452,12 @@ specifier_qualifier_list_opt:
 specifier_qualifier_list:
 	type_specifier specifier_qualifier_list_opt
 	| type_qualifier specifier_qualifier_list_opt
+	;
+
+
+struct_declarator_list_opt:
+	struct_declarator_list
+	|
 	;
 
 ##struct_declarator_list:
@@ -500,50 +538,86 @@ type_qualifier:
 				  
 
 #3.5.4 Declarators
+#
+#          declarator:
+#                  pointer<opt> direct-declarator
+#
+#          direct-declarator:
+#                  identifier
+#                  (  declarator ) 
+#                  direct-declarator [  constant-expression<opt> ] 
+#
+#                  direct-declarator (  parameter-type-list ) 
+#                  direct-declarator (  identifier-list<opt> )
+#
+#          pointer:
+#                  *  type-qualifier-list<opt>
+#                  *  type-qualifier-list<opt> pointer
+#
+#          type-qualifier-list:
+#                  type-qualifier
+#                  type-qualifier-list type-qualifier
+#
+#          parameter-type-list:
+#                  parameter-list
+#                  parameter-list , ...
+#
+#          parameter-list:
+#                  parameter-declaration
+#                  parameter-list ,  parameter-declaration
+#
+#          parameter-declaration:
+#                  declaration-specifiers declarator
+#                  declaration-specifiers abstract-declarator<opt>
+#
+#          identifier-list:
+#                  identifier
+#                  identifier-list ,  identifier
+
+# Adaptations:
+#   Changed "parameter-type-list" to "parameter-type-list<opt>"
+#   because it must accept and empty list
+#
+#   Removed: direct-declarator (  identifier-list<opt> )
+#   I Suppose this production is in place to support K&R style - will not support by now
+#
+#   pointer:
+#           *  type-qualifier-list<opt>
+#           *  type-qualifier-list<opt> pointer
+#
+#   changed to:
+#
+#   pointer:
+#           *  type-qualifier-list<opt> pointer<opt>
+#
+#   Changed how ELLIPSIS is accepted
+#
+#   Removed: identifier-list
+#   I suppose it's for K&R, not supporting K&R
+
 declarator:
 	pointer_opt direct_declarator
 	;
 
-##direct_declarator:
-##	identifier
-##	| OP declarator CP 
-##	| direct_declarator OB constant_expression_opt CB 
-##	| direct_declarator OP parameter_type_list CP 
-##	| direct_declarator OP identifier_list_opt CP
-##	;
-
 direct_declarator:
-	IDENTIFIER direct_declarator_lr { 
-			fprintf(stderr,"IDENT: %s, %d\n", terms[0].str, typedefFlag);
+	IDENTIFIER [ direct_declarator_postfix_options ]
+		{ 
 			if(typedefFlag){
 				symbolTableRegister(((struct cparser_extra *)(self->extra))->syms, terms[0].str, 1);
 			}
 		}
-	| OP declarator CP direct_declarator_lr
+	| OP declarator CP [ direct_declarator_postfix_options ]
 	;
 
-direct_declarator_lr:
-	OB constant_expression_opt CB direct_declarator_lr
-
-	# changed to parameter_type_list_opt because it must accept and empty list
-	#| OP parameter_type_list CP direct_declarator_lr
-	| OP parameter_type_list_opt CP direct_declarator_lr
-
-	# I Suppose next production is for K&R style - will not support by now
-	# to avoid the need for disambiguation
-	#| OP identifier_list_opt CP direct_declarator_lr (for later)
-	|
+direct_declarator_postfix_options:
+	OB constant_expression_opt CB 
+	| OP parameter_type_list_opt CP
 	;
 
 pointer_opt:	
 	pointer
 	|
 	;
-
-##pointer:
-##	STAR type_qualifier_list_opt
-##	| STAR type_qualifier_list_opt pointer
-##	;
 
 pointer:
 	STAR type_qualifier_list_opt pointer_opt
@@ -554,11 +628,6 @@ type_qualifier_list_opt:
 	|
 	;
 
-##type_qualifier_list:
-##	type_qualifier
-##	| type_qualifier_list type_qualifier
-##	;
-
 type_qualifier_list:
 	type_qualifier [ type_qualifier ]
 	;
@@ -568,21 +637,10 @@ parameter_type_list_opt:
 	|
 	;
 
+# Will not accept ELLIPSIS here
 parameter_type_list:
 	parameter_list 
-	#parameter_type_list_disambiguation
 	;
-
-# Will not accept ELLIPSIS here
-parameter_type_list_disambiguation:
-	COMMA ELLIPSIS
-	|
-	;
-
-##parameter_list:
-##	parameter_declaration
-##	| parameter_list COMMA parameter_declaration
-##	;
 
 parameter_list:
 	parameter_declaration [ COMMA parameter_declaration ]
@@ -599,31 +657,20 @@ parameter_declaration_disambiguation:
 	| abstract_declarator_opt
 	;
 
-#
-#
-# identifier_list:
-#	identifier 
-#	| identifier_list COMMA  identifier
-#	;
-
-## I Suppose it's for K&R support. Will not support by now
-##
-##identifier_list:
-##	IDENTIFIER identifier_list_lr
-##	;
-##
-##dentifier_list_opt:
-##	identifier_list
-##	|
-##	;
-##
-##identifier_list_lr:
-##	COMMA  IDENTIFIER
-##	|
-##	;
-##
-
 #3.5.5 Type names
+#
+#          type-name:
+#                  specifier-qualifier-list abstract-declarator<opt>
+#
+#          abstract-declarator:
+#                  pointer
+#                  pointer<opt> direct-abstract-declarator
+#
+#          direct-abstract-declarator:
+#                  (  abstract-declarator ) 
+#                  direct-abstract-declarator<opt> [  constant-expression<opt> ] 
+#                  direct-abstract-declarator<opt> (  parameter-type-list<opt> )
+
 
 type_name:
 	specifier_qualifier_list abstract_declarator_opt
@@ -635,8 +682,8 @@ abstract_declarator_opt:
 	;
 
 abstract_declarator:
-	pointer
-	pointer_opt direct_abstract_declarator
+	pointer direct_abstract_declarator_opt
+	| direct_abstract_declarator
 	;
 
 direct_abstract_declarator_opt:
@@ -645,9 +692,12 @@ direct_abstract_declarator_opt:
 	;
 
 direct_abstract_declarator:
-	OP  abstract_declarator CP 
-	| direct_abstract_declarator_opt OB  constant_expression_opt CB 
-	| direct_abstract_declarator_opt OP  parameter_type_list_opt CP
+	OP abstract_declarator CP [ direct_abstract_declarator_postfix_options ]
+	;
+
+direct_abstract_declarator_postfix_options:
+	OB constant_expression_opt CB 
+	| OP parameter_type_list_opt CP
 	;
 
 # 3.6 STATEMENTS
@@ -662,39 +712,44 @@ statement:
 	;
 
 # 3.6.1 Labeled statements
+#
+#          labeled-statement:
+#                  identifier :  statement
+#                  case  constant-expression :  statement
+#                  default :  statement
+#
+#
+# Adaptations:
+#   rule starting with IDENTIFIER conflicts with statement.
+#   parser needs to look ahead second token to disambiguate
+#   rdppgen does not perform look ahead.
+#   A diffetente solution need to be done
 
 labeled_statement:
-	# rule starting with IDENTIFIER conflicts with statement.
-	# parser needs to look ahead second token to disambiguate
-	# bit rdppgen does not perform look ahead
-	# A diffetente solution need to be done
-	# 
-	#IDENTIFIER COLON  statement
-	#| CASE  constant_expression COLON  statement
 	CASE constant_expression COLON statement
 	| DEFAULT COLON statement
 	;
 
-
 # 3.6.2 Compound statement, or block
-
-# As both declaration_list<opt> statement_list<opt> are only used here
-# We can safely remove <opt> flags and at empty for ruleset os both 
-# these nonterminals
 #
-#compound_statement:
-#	OBLOCK declaration_list<opt> statement_list<opt> CBLOCK
-#	;
+#          compound_statement:
+#                  OBLOCK declaration_list<opt> statement_list<opt> CBLOCK
+#                  ;
 #
-#declaration_list:
-#	declaration
-#	| declaration-list declaration
-#	;
+#          declaration_list:
+#                  declaration
+#                  | declaration-list declaration
+#                  ;
 #
-#statement_list:
-#	statement
-#	| statement-list statement
-#	;
+#          statement_list:
+#                  statement
+#                  | statement-list statement
+#                  ;
+#
+# Adaptations:
+#   As both declaration_list<opt> statement_list<opt> are only used here
+#   We can safely remove <opt> flags and at empty for ruleset os both 
+#   these nonterminals
 
 compound_statement:
 	OBLOCK declaration_list statement_list CBLOCK
@@ -710,16 +765,11 @@ statement_list:
 	|
 	;
 
-#statement_list:
-#	statement statement_list
-#	|
-#	;
-
 # 3.6.3 Expression and null statements
-
-#expression_statement:
-#	expression_opt SEMICOLON
-#	;
+#
+#          expression-statement:
+#                  expression<opt> ;
+#
 
 expression_statement:
 	expression SEMICOLON
@@ -776,7 +826,7 @@ return_value:
 ##	;
 
 translation_unit:
-	external_declaration translation_unit
+	external_declaration [ external_declaration ]
 	|
 	;
 

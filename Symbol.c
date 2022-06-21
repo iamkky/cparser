@@ -21,6 +21,10 @@ SymbolTable self;
 
 int symbolTableRegister(SymbolTable self, char *name, int type)
 {
+	if(self->size>=self->allocated){
+		fprintf(stderr,"Symbol table overflow\n");
+		exit(-1);
+	}
 	self->s[self->size].name = strdup(name);
 	self->s[self->size].type = type;
 	self->size++;
