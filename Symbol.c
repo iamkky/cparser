@@ -28,6 +28,7 @@ int symbolTableRegister(SymbolTable self, char *name, int type)
 	self->s[self->size].name = strdup(name);
 	self->s[self->size].type = type;
 	self->size++;
+	//fprintf(stderr,"Symbol: %s registered as typedef\n", name);
 }
 
 int symbolTableGetType(SymbolTable self, char *name)

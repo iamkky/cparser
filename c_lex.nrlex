@@ -90,6 +90,9 @@ struct keyword keywords[] = {
 	{"if",		IF},
 	{"static",	STATIC},
 	{"while",	WHILE},
+	{"inline",	INLINE},   // C99 inline
+	{"__inline",	INLINE},   // C99 inline
+	{"__inline__",	INLINE},   // C99 inline
 	{NULL,		0}
 };
 
@@ -107,13 +110,12 @@ int	isTypedef;
 		}
 	}
 	
-	fprintf(stderr,"XX: %s\n", str);
 	if(isTypedef = symbolTableGetType(((struct cparser_extra *)extra)->syms, str)){
-		fprintf(stderr,"Typedef detected: %s\n", str);
+		//fprintf(stderr,"Typedef detected: %s\n", str);
 		return TYPEDEF_NAME;
 	}
 
-	fprintf(stderr,"Identifier detected: %s\n", str);
+	//fprintf(stderr,"Identifier detected: %s\n", str);
 	return IDENTIFIER;
 }
 

@@ -43,9 +43,6 @@ int default_action(xParser self, xParserType *result, xParserType *terms, int *t
 Tree t;
 int  i;
 
-	if(self->valueSp>500){
-		fprintf(stderr,"Stack: %d\n", self->valueSp);
-	}
 	if(result->t==NULL)
 		t = treeNew(nt_id, "nt");
 	else
@@ -110,10 +107,10 @@ postfix_expression:
 	;
 
 postfix_expression_lr:
-	OB  expression CB postfix_expression_lr
-	| OP  argument_expression_list_opt CP postfix_expression_lr
-	| DOT   IDENTIFIER postfix_expression_lr
-	| ARROW  IDENTIFIER postfix_expression_lr
+	  OB expression CB postfix_expression_lr
+	| OP argument_expression_list_opt CP postfix_expression_lr
+	| DOT IDENTIFIER postfix_expression_lr
+	| ARROW IDENTIFIER postfix_expression_lr
 	| DEC postfix_expression_lr
 	| INC postfix_expression_lr
 	|
@@ -130,7 +127,7 @@ argument_expression_list:
 
 # 3.3.3 Unary operators
 unary_expression:
-	postfix_expression
+	  postfix_expression
 	| INC unary_expression
 	| DEV unary_expression
 	| unary_operator cast_expression
@@ -138,12 +135,12 @@ unary_expression:
 	;
 
 unary_expression_disambiguation:
-	OP type_name CP
+	  OP type_name CP
 	| unary_expression
 	;
 
 unary_operator:
-	AMPERSAND
+	  AMPERSAND
 	| START
 	| PLUS
 	| MINUS
@@ -275,7 +272,7 @@ conditional_expression_disambiguation:
 #	=  *=  /=  %=  +=  -=  <<=  >>=  &=  ^=  |=   (for later)
 #
 #	condition_expression can reduce to an unary_expression
-#	this ruleset has to rules that start with same TERMINAL.
+#	this ruleset has two rules that start with same TERMINAL.
 #	A solution is to change unary_expression to condition_expression 
 #	and use a disambiguation technic, and let correctness check for
 #	semantic.
@@ -295,17 +292,24 @@ assignment_expression_disambiguation:
 	;
 
 assignment_operator:
-	ASSIGN | ASSIGN_MUL | ASSIGN_DIV | ASSIGN_MOD | ASSIGN_ADD | ASSIGN_SUB
-	| ASSIGN_SHFL | ASSIGN_SHFR | ASSIGN_AND | ASSIGN_NEG | ASSIGN_OR
+	  ASSIGN
+	| ASSIGN_MUL
+	| ASSIGN_DIV
+	| ASSIGN_MOD
+	| ASSIGN_ADD
+	| ASSIGN_SUB
+	| ASSIGN_SHFL
+	| ASSIGN_SHFR
+	| ASSIGN_AND
+	| ASSIGN_NEG
+	| ASSIGN_OR
 	;
 
 # 3.3.17 Comma operator
-
-#expression:
-#	assignment_expression
-#	| expression COMMA assignment_expression
-#	;
-# Under construction
+#
+#          expression:
+#                  assignment-expression
+#                  expression ,  assignment-expression
 	
 expression_opt:
 	expression
@@ -328,57 +332,87 @@ constant_expression:
 	;
 
 # 3.5 DECLARATIONS
+#
+#          declaration:
+#                  declaration-specifiers init-declarator-list<opt> ;
+#
+#          declaration-specifiers:
+#                  storage-class-specifier declaration-specifiers<opt>
+#                  type-specifier declaration-specifiers<opt>
+#                  type-qualifier declaration-specifiers<opt>
+#
+#          init-declarator-list:
+#                  init-declarator
+#                  init-declarator-list ,  init-declarator 
+#
+#          init-declarator:
+#                  declarator
+#                  declarator =  initializer
+#
 
-#declaration:
-#	declaration_specifiers init_declarator_list_opt SEMICOLON
-#	;
+# Adaptations:
+#
+#   function definition is parsed as a declaration followed by a compound statement
+#   semantics will be required to decide if it's just a declaration or a definition.
+#
+#   Note: this grammar requires at least one "declaration_specifier" for functions
+#   Which diverge from c89, that accepts unspecified functions.
+#
+#          function-definition:
+#                  declaration-specifiers<opt> declarator declaration-list<opt> compound-statement
 
 declaration:
 	{typedefFlag = 0;}
-	declaration_specifiers { if(terms[0].st_class==TYPEDEFNAME) typedefFlag = 1; else typedefFlag = 0; }
-		init_declarator_list_opt function_definition_or_declaration_end
+	declaration_specifiers
+		{ if(terms[0].st_class==TYPEDEFNAME) typedefFlag = 1; else typedefFlag = 0; }
+		init_declarator_list_opt function_definition_or_declaration_complement
 	;
 
-function_definition_or_declaration_end:
+function_definition_or_declaration_complement:
 	compound_statement
 	| SEMICOLON
-	|
 	;
 
 declaration_specifiers:
-	storage_class_specifier declaration_specifiers_opt { result.st_class = terms[0].st_class | terms[1].st_class; }
-	| type_specifier declaration_specifiers_opt        { result.st_class = terms[1].st_class; }
-	| type_qualifier declaration_specifiers_opt        { result.st_class = terms[1].st_class; }
+	declaration_specifier { result.st_class = terms[0].st_class; } [ declaration_specifier { result.st_class |= terms[1].st_class; } ]
 	;
 
-declaration_specifiers_opt:
-	declaration_specifiers { result.st_class = terms[0].st_class; }
-	|			
+declaration_specifier:
+	storage_class_specifier { result.st_class = terms[0].st_class; }
+	| type_specifier { result.st_class = terms[0].st_class; }
+	| type_qualifier { result.st_class = terms[0].st_class; }
+	| function_specifier     # C99 inline
 	;
 
 init_declarator_list_opt:
 	init_declarator_list
 	|
 	;
-##
-## init_declarator_list:
-##	init_declarator
-##	| init_declarator_list COMMA init_declarator
-##	;
 
 init_declarator_list:
 	init_declarator [ COMMA init_declarator ]
 	;
 
 init_declarator:
-	declarator 
-	#| declarator ASSIGN initializer (for later)
+	declarator init_declarator_assignment
 	;
 
+init_declarator_assignment:
+	ASSIGN initializer
+	|
+	;
+
+# C99 inline
+#
+
+function_specifier:
+	INLINE
+	;
 
 #3.5.1 Storage-class specifiers
+
 storage_class_specifier:
-	TYPEDEF { result.st_class = TYPEDEFNAME; }
+	  TYPEDEF { result.st_class = TYPEDEFNAME; }
 	| EXTERN
 	| STATIC
 	| AUTO
@@ -386,8 +420,9 @@ storage_class_specifier:
 	;
 
 #3.5.2 Type specifiers
+
 type_specifier:
-	VOID
+	  VOID
 	| CHAR
 	| SHORT
 	| INT
@@ -413,7 +448,7 @@ struct_or_union_specifier:
 	;
 
 struct_or_union_specifier_disambiguation:
-	OBLOCK struct_declaration_list CBLOCK
+	  OBLOCK struct_declaration_list CBLOCK
 	| IDENTIFIER struct_or_union_specifier_disambiguation2 
 	;
 
@@ -423,7 +458,7 @@ struct_or_union_specifier_disambiguation2:
 	;
 
 struct_or_union:
-	STRUCT
+	  STRUCT
 	| UNION
 	;
 
@@ -449,11 +484,14 @@ specifier_qualifier_list_opt:
 	|
 	;
 
-specifier_qualifier_list:
-	type_specifier specifier_qualifier_list_opt
-	| type_qualifier specifier_qualifier_list_opt
+specifier_qualifier:
+	  type_specifier
+	| type_qualifier
 	;
 
+specifier_qualifier_list:
+	specifier_qualifier [ specifier_qualifier ]
+	;
 
 struct_declarator_list_opt:
 	struct_declarator_list
@@ -600,12 +638,14 @@ declarator:
 	;
 
 direct_declarator:
-	IDENTIFIER [ direct_declarator_postfix_options ]
+	IDENTIFIER 
 		{ 
 			if(typedefFlag){
 				symbolTableRegister(((struct cparser_extra *)(self->extra))->syms, terms[0].str, 1);
+				typedefFlag = 0;
 			}
 		}
+		[ direct_declarator_postfix_options ]
 	| OP declarator CP [ direct_declarator_postfix_options ]
 	;
 
@@ -699,6 +739,34 @@ direct_abstract_declarator_postfix_options:
 	OB constant_expression_opt CB 
 	| OP parameter_type_list_opt CP
 	;
+
+
+# 3.5.7 Initialization
+#
+#          initializer:
+#                  assignment-expression
+#                  {  initializer-list } 
+#                  {  initializer-list , }
+#
+#          initializer-list:
+#                  initializer
+#                  initializer-list ,  initializer
+#
+
+initializer:
+	assignment_expression
+	| OB initializer_list initializer_list_comma_opt CB
+	;
+
+initializer_list_comma_opt:
+	COMMA
+	|
+	;
+
+initializer_list:
+	initializer [ COMMA initializer ]
+	;
+
 
 # 3.6 STATEMENTS
 
@@ -826,6 +894,7 @@ return_value:
 ##	;
 
 translation_unit:
+#	external_declaration
 	external_declaration [ external_declaration ]
 	|
 	;

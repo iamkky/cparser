@@ -51,7 +51,7 @@ struct cparser_extra extra;
 	buffer = readToBuffer(0, 32768, 1, &bytes);
 	buffer[bytes] = 0;
 	
-	extra.syms = symbolTableNew(200);
+	extra.syms = symbolTableNew(500);
 	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
 
 	x = xParserNew(buffer, (void *)&extra);	
@@ -72,9 +72,11 @@ struct cparser_extra extra;
 		treePrint(x->value[0].t, stdout, 2);
 		fprintf(stdout,"\n");
 
+/*
 		fprintf(stdout,"Result (only tokens):\n");
 		treePrintToken(x->value[0].t, stdout, 2, RDPP_NONTERMINAL_START);
 		fprintf(stdout,"\n\n");
+*/
 	
 		x->value[0].t = treeReduceToMinimal(x->value[0].t, RDPP_NONTERMINAL_START);
 
@@ -92,11 +94,6 @@ struct cparser_extra extra;
 		//fprintf(stdout,"\nCode:\n");
 		//cxComponentListGenCode(list, stdout, 0);
 		//fprintf(stdout,";\n");
-		/*
-		fprintf(stderr,"Value Type %02d\n", jsonValueGetType(json));
-		fprintf(stdout,"\n");
-		jsonValueFree(json);
-		*/
 	}else{
 		fprintf(stderr,"Failed to parse!\n");
 	}
