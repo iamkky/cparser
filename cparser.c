@@ -34,27 +34,24 @@ char *buffer, *tmp;
 	return buffer;
 }
 
-struct cparser_extra{
-	SymbolTable	syms;
-};
-
-
 int main(int argc, char **argv)
 {
 //CxValue  json;
 xParser x;
 char *buffer;
 int bytes, result;
-struct cparser_extra extra;
+xParserExtraDataType extra;
 
 	//bytes = read(0, buffer, 32767);
 	buffer = readToBuffer(0, 32768, 1, &bytes);
 	buffer[bytes] = 0;
 	
 	extra.syms = symbolTableNew(500);
+	extra.struct_or_union_name_escope = 0;
+	extra.level = 0;
 	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
 
-	x = xParserNew(buffer, (void *)&extra);	
+	x = xParserNew(buffer, &extra);	
 
 	result = xParserParse(x);
 

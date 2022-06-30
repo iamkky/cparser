@@ -12,10 +12,6 @@
 
 #define TOKENDEBUG 1
 
-struct cparser_extra{
-	SymbolTable	syms;
-};
-
 // Lex Helper function
 static char *nrDupToken(char *input, int size);
 
@@ -90,9 +86,12 @@ struct keyword keywords[] = {
 	{"if",		IF},
 	{"static",	STATIC},
 	{"while",	WHILE},
-	{"inline",	INLINE},   // C99 inline
-	{"__inline",	INLINE},   // C99 inline
-	{"__inline__",	INLINE},   // C99 inline
+	{"inline",	INLINE},	// C99 inline
+	{"__inline",	INLINE},	// C99 inline
+	{"__inline__",	INLINE},	// C99 inline
+	{"restrict",	RESTRICT},	// C99 restrict
+	{"__restrict",	RESTRICT},	// C99 restrict
+	{"__restrict__",RESTRICT},	// C99 restrict
 	{NULL,		0}
 };
 
@@ -110,9 +109,11 @@ int	isTypedef;
 		}
 	}
 	
-	if(isTypedef = symbolTableGetType(((struct cparser_extra *)extra)->syms, str)){
-		//fprintf(stderr,"Typedef detected: %s\n", str);
-		return TYPEDEF_NAME;
+	if(((xParserExtraDataType *)extra)->struct_or_union_name_escope == 0){
+		if(isTypedef = symbolTableGetType(((xParserExtraDataType *)extra)->syms, str)){
+			//fprintf(stderr,"Typedef detected: %s\n", str);
+			return TYPEDEF_NAME;
+		}
 	}
 
 	//fprintf(stderr,"Identifier detected: %s\n", str);

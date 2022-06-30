@@ -15,10 +15,6 @@
 #define TOKENDEBUG 1
 #define RETURNDEBUG 1
 
-struct cparser_extra{
-        SymbolTable     syms;
-};
-
 #define _ddebug_printf _ddprintf
 
 static int _ddprintf(char *fmt, ...)
@@ -75,6 +71,15 @@ struct {
 %%action { default_action(self, &result, terms, types, start, end, rdpp_nt_id); }
 
 %%names
+
+%%extra {
+	struct cparser_extra{
+        	SymbolTable     syms;
+		int		struct_or_union_name_escope;
+		int		level;
+	}
+}
+
 
 #top: lextest ;
 top: translation_unit ;
@@ -384,6 +389,10 @@ declaration_specifier:
 	| function_specifier     # C99 inline
 	;
 
+function_specifier:
+	INLINE
+	;
+
 init_declarator_list_opt:
 	init_declarator_list
 	|
@@ -400,13 +409,6 @@ init_declarator:
 init_declarator_assignment:
 	ASSIGN initializer
 	|
-	;
-
-# C99 inline
-#
-
-function_specifier:
-	INLINE
 	;
 
 #3.5.1 Storage-class specifiers
@@ -431,10 +433,10 @@ type_specifier:
 	| DOUBLE
 	| SIGNED
 	| UNSIGNED
-	| struct_or_union_specifier
-	| enum_specifier
+	| { self->extra->struct_or_union_name_escope = 1; } struct_or_union_specifier
+	| { self->extra->struct_or_union_name_escope = 0; } enum_specifier
 	| TYPEDEF_NAME
-	;
+	;	
 
 # 3.5.2.1 Structure and union specifiers
 
@@ -444,12 +446,12 @@ type_specifier:
 ##	;
 
 struct_or_union_specifier:
-	struct_or_union struct_or_union_specifier_disambiguation
+	struct_or_union	struct_or_union_specifier_disambiguation
 	;
 
 struct_or_union_specifier_disambiguation:
-	  OBLOCK struct_declaration_list CBLOCK
-	| IDENTIFIER struct_or_union_specifier_disambiguation2 
+	IDENTIFIER { self->extra->struct_or_union_name_escope = 0; } struct_or_union_specifier_disambiguation2 
+	| { self->extra->struct_or_union_name_escope = 0; } OBLOCK struct_declaration_list CBLOCK
 	;
 
 struct_or_union_specifier_disambiguation2:
@@ -571,11 +573,12 @@ enumerator_disambiguation:
 #
 type_qualifier:
 	CONST
+	| RESTRICT		# C99 
 	| VOLATILE
 	;
 				  
 
-#3.5.4 Declarators
+# 3.5.4 Declarators
 #
 #          declarator:
 #                  pointer<opt> direct-declarator
@@ -584,7 +587,6 @@ type_qualifier:
 #                  identifier
 #                  (  declarator ) 
 #                  direct-declarator [  constant-expression<opt> ] 
-#
 #                  direct-declarator (  parameter-type-list ) 
 #                  direct-declarator (  identifier-list<opt> )
 #
@@ -611,7 +613,23 @@ type_qualifier:
 #          identifier-list:
 #                  identifier
 #                  identifier-list ,  identifier
+#
+# 3.5.5 Type names
+#
+#          type-name:
+#                  specifier-qualifier-list abstract-declarator<opt>
+#
+#          abstract-declarator:
+#                  pointer
+#                  pointer<opt> direct-abstract-declarator
+#
+#          direct-abstract-declarator:
+#                  (  abstract-declarator ) 
+#                  direct-abstract-declarator<opt> [  constant-expression<opt> ] 
+#                  direct-abstract-declarator<opt> (  parameter-type-list<opt> )
+#
 
+#
 # Adaptations:
 #   Changed "parameter-type-list" to "parameter-type-list<opt>"
 #   because it must accept and empty list
@@ -632,25 +650,36 @@ type_qualifier:
 #
 #   Removed: identifier-list
 #   I suppose it's for K&R, not supporting K&R
+#
+#   Had to merge direct_declarator with abstract_directe_declarator
+#   because has no way to know which one is the case 
 
 declarator:
-	pointer_opt direct_declarator
+	pointer_opt direct_or_abstract_declarator
 	;
 
-direct_declarator:
-	IDENTIFIER 
+direct_or_abstract_declarator:
+	IDENTIFIER 			
 		{ 
 			if(typedefFlag){
-				symbolTableRegister(((struct cparser_extra *)(self->extra))->syms, terms[0].str, 1);
+				symbolTableRegister((self->extra)->syms, terms[0].str, 1);
 				typedefFlag = 0;
 			}
 		}
 		[ direct_declarator_postfix_options ]
-	| OP declarator CP [ direct_declarator_postfix_options ]
+	| OP parameter_type_list_or_declarator CP [ direct_declarator_postfix_options ]
+	| OB constant_expression_opt CB [ direct_declarator_postfix_options ]
+	|
+	;
+
+parameter_type_list_or_declarator:
+	  parameter_type_list
+	| declarator
+	|
 	;
 
 direct_declarator_postfix_options:
-	OB constant_expression_opt CB 
+	  OB constant_expression_opt CB 
 	| OP parameter_type_list_opt CP
 	;
 
@@ -693,51 +722,18 @@ parameter_declaration:
 	;
 
 parameter_declaration_disambiguation:
-	declarator
-	| abstract_declarator_opt
+	declarator			# declarator covers direct and abstract
+	#| abstract_declarator_opt
 	;
-
-#3.5.5 Type names
-#
-#          type-name:
-#                  specifier-qualifier-list abstract-declarator<opt>
-#
-#          abstract-declarator:
-#                  pointer
-#                  pointer<opt> direct-abstract-declarator
-#
-#          direct-abstract-declarator:
-#                  (  abstract-declarator ) 
-#                  direct-abstract-declarator<opt> [  constant-expression<opt> ] 
-#                  direct-abstract-declarator<opt> (  parameter-type-list<opt> )
-
 
 type_name:
-	specifier_qualifier_list abstract_declarator_opt
+	#specifier_qualifier_list abstract_declarator_opt
+	specifier_qualifier_list declarator
 	;
 
-abstract_declarator_opt:
-	abstract_declarator
+declarator_opt:
+	declarator
 	|
-	;
-
-abstract_declarator:
-	pointer direct_abstract_declarator_opt
-	| direct_abstract_declarator
-	;
-
-direct_abstract_declarator_opt:
-	direct_abstract_declarator
-	|
-	;
-
-direct_abstract_declarator:
-	OP abstract_declarator CP [ direct_abstract_declarator_postfix_options ]
-	;
-
-direct_abstract_declarator_postfix_options:
-	OB constant_expression_opt CB 
-	| OP parameter_type_list_opt CP
 	;
 
 
@@ -820,7 +816,7 @@ labeled_statement:
 #   these nonterminals
 
 compound_statement:
-	OBLOCK declaration_list statement_list CBLOCK
+	OBLOCK { self->extra->level++; } declaration_list statement_list { self->extra->level--; } CBLOCK
 	;
 
 declaration_list:
