@@ -4,10 +4,13 @@ RDPPGEN=rdppgen
 
 CFLAGS+=-I. -gstabs 
 
-all: libcl.a cparser
+all: libcl.a cparser cprinttoken
 
 cparser: cparser.o libcl.a Tree.o Symbol.o
 	$(CC) $(CFLAGS) -o cparser cparser.o libcl.a Tree.o Symbol.o
+
+cprinttoken: cprinttoken.o libcl.a Tree.o Symbol.o
+	$(CC) $(CFLAGS) -o cprinttoken cprinttoken.o libcl.a Tree.o Symbol.o
 
 libcl.a: c_lex.nrlex c_parser.rdpp Tree.c
 	$(RDPPGEN) c_parser.rdpp
@@ -18,5 +21,5 @@ libcl.a: c_lex.nrlex c_parser.rdpp Tree.c
 	$(AR) rcs libcl.a c_lex.o c_parser.o
 
 clean:
-	rm -f *.o c_lex.c c_lex.h c_parser.c c_parser.h c_parser.tokens.h cparser libcl.a
+	rm -f *.o c_lex.c c_lex.h c_parser.c c_parser.h c_parser.tokens.h cparser cprinttoken libcl.a 
 

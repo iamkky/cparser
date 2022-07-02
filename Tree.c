@@ -4,10 +4,10 @@
 #include "Tree.h"
 #include "c_parser.tokens.h"
 
-//#define NO_ANSITERM
+#define NO_ANSITERM
 #include "ansiterm.h" 
 
-Tree treeNew(int type, char *value)
+Tree treeNew(int type, char *value, char *file, int lnumber)
 {
 Tree self;
 int i;
@@ -22,6 +22,8 @@ int i;
 	self->value = value ? strdup(value) : NULL;
 	self->n_child = 0;
 	self->n_child_allocated = 128;
+	self->file = file;
+	self->lnumber = lnumber;
 
 	if((self->child = malloc(sizeof(Tree) * self->n_child_allocated))==NULL){
 		free(self);
@@ -40,7 +42,7 @@ int i;
 		return -1;
 	}
 	if(self->n_child>=self->n_child_allocated){
-		if((self->child = malloc(sizeof(Tree) * 2 * self->n_child_allocated))==NULL){
+		if((self->child = realloc(self->child, sizeof(Tree) * 2 * self->n_child_allocated))==NULL){
 			return -1;
 		}
 		self->n_child_allocated = 2 * self->n_child_allocated;
@@ -87,8 +89,8 @@ int c, i;
 		fprintf(fp, ANSIBOLD ANSIGREEN "%s[%d]" ANSIRESET,
 			Rdpp_xParserNonterminals_Names[self->type-10000], self->type);
 	}else{
-		fprintf(fp, ANSIBOLD ANSIBLUE "%s[%d] value:[[" ANSIRED "%s" ANSIBLUE "]]" ANSIRESET,
-			Rdpp_xParserTerminals_Names[self->type-1000], self->type, self->value);
+		fprintf(fp, ANSIBOLD ANSIBLUE "%s[%d] value:[[" ANSIRED "%s" ANSIBLUE "]]" ANSIRESET " file:%s, line:%d",
+			Rdpp_xParserTerminals_Names[self->type-1000], self->type, self->value, self->file, self->lnumber);
 	}
 	fprintf(fp,", p:%p", self);
 	fprintf(fp,", childreen:%d", self->n_child);
@@ -112,7 +114,11 @@ int c, i;
 		for(c=0; c<level; c++){
 			fprintf(fp," ");
 		}
-		fprintf(fp,"%s", t->value);
+		if(t->type == STRING){
+			fprintf(fp,"\"%s\"", t->value);
+		}else{
+			fprintf(fp,"%s", t->value);
+		}
 		fprintf(fp,"\n");
 	}
 	for(i=0; i<t->n_child; i++){

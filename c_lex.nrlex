@@ -12,42 +12,6 @@
 
 #define TOKENDEBUG 1
 
-// Lex Helper function
-static char *nrDupToken(char *input, int size);
-
-static char *getString(char *input, int *cursor, char escape, char closure)
-{
-char *tmp, *newtmp, *p, last;
-int  size, used, count;
-
-	if((p = tmp = malloc(size = 128))==NULL) return NULL;
-	*p = used = count = 0;
-
-	if(*input++!=closure) return tmp;
-
-	while((last = (*p++ = *input++))){
-		count++;
-		if(last==closure){
-			*(p-1)=0;
-			break;
-		}else if(last==escape && *input==closure) {
-			*(p-1)=closure;
-			input++;
-			count++;
-		}
-		if(++used>=size-1) {
-			if((newtmp = realloc(tmp, size = (2 * size)))==NULL) {
-				free(tmp);
-				return NULL;
-			}
-			p = (tmp = newtmp) + count;
-		}
-	}
-
-	(*cursor)+=count;
-	return tmp;
-}
-
 struct keyword {
 	char	*name;
 	int	token;
@@ -86,16 +50,127 @@ struct keyword keywords[] = {
 	{"if",		IF},
 	{"static",	STATIC},
 	{"while",	WHILE},
+	{"asm",		ASM},		// GNU asm()
+	{"__asm",	ASM},		// GNU asm()
+	{"__asm__",	ASM},		// GNU asm()
 	{"inline",	INLINE},	// C99 inline
-	{"__inline",	INLINE},	// C99 inline
-	{"__inline__",	INLINE},	// C99 inline
+	{"__inline",	INLINE},	// GNU inline
+	{"__inline__",	INLINE},	// GNU inline
 	{"restrict",	RESTRICT},	// C99 restrict
-	{"__restrict",	RESTRICT},	// C99 restrict
-	{"__restrict__",RESTRICT},	// C99 restrict
+	{"__restrict",	RESTRICT},	// GNU restrict
+	{"__restrict__",RESTRICT},	// GNU restrict
 	{NULL,		0}
 };
 
-int processIdentifier(xParserType *value, char *input, int size, void *extra)
+
+// Lex Helper function
+static char *nrDupToken(char *input, int size);
+
+char static *getString(char *input, int *cursor, char escape, char closure)
+{
+char *tmp, *newtmp, *p, last;
+int  size, used, count;
+
+	if((p = tmp = malloc(size = 128))==NULL) return NULL;
+	*p = used = count = 0;
+
+	if(*input++!=closure) return tmp;
+
+	while((last = (*p++ = *input++))){
+		count++;
+		if(last==closure){
+			*(p-1)=0;
+			break;
+		}else if(last==escape && *input==closure) {
+			*(p-1)=closure;
+			input++;
+			count++;
+		}
+		if(++used>=size-1) {
+			if((newtmp = realloc(tmp, size = (2 * size)))==NULL) {
+				free(tmp);
+				return NULL;
+			}
+			p = (tmp = newtmp) + count;
+		}
+	}
+
+	(*cursor)+=count;
+	return tmp;
+}
+
+int static isDigit(int ch)
+{
+	return ch>='0' && ch<='9';
+}
+
+int static processLineMarker(xParserType *value, char *input, int *cursor, void *extra)
+{
+xParserExtraDataType	*e;
+char			*p, *file, *f;
+int			number = 0, c = 0;
+
+	p = input;
+	input += 2;	// skip "# " 
+
+	while(*input==' ' || *input=='\t') input++;
+	while(isDigit(*input))
+		number = 10 * number + (*input++) - '0';
+
+	while(*input==' ' || *input=='\t') input++;
+	if(*input=='"'){
+		f = ++input;
+		while(*input!=0 && *input!='"' && *input!='\n') { c++; input++; }
+		file = nrDupToken(f, c);
+	}
+
+	while(*input!=0 && *input!='\n') input++;
+	(*cursor)+=(input - p);
+
+	fprintf(stderr,"#LINE %d %s\n", number, file);
+
+	e = (xParserExtraDataType *)extra;
+
+	e->lnumber = number;
+	e->file = file;
+
+	return 0;
+}
+
+int static processHashLines(xParserType *value, char *input, int *cursor, void *extra)
+{
+char	*str, *tmp;
+int	count;
+int	lineno;
+
+	count=0;
+	str=input;	
+
+	if(*(input+1)==' ' && isDigit(*(input+2))){
+		return processLineMarker(value, input, cursor, extra);
+	}
+
+	while(*str!=0 && *str!='\n'){
+		str++;
+		count++;
+	}
+/*
+	if(((xParserExtraDataType *)extra)->struct_or_union_name_escope == 0){
+		if(isTypedef = symbolTableGetType(((xParserExtraDataType *)extra)->syms, str)){
+			//fprintf(stderr,"Typedef detected: %s\n", str);
+			return TYPEDEF_NAME;
+		}
+	}
+*/
+	tmp = value->str = nrDupToken(input, count);
+	fprintf(stderr,"#LINE:%s\n", tmp);
+	free(tmp);
+	
+	(*cursor)+=count;
+	return 0;
+}
+
+int static processIdentifier(xParserType *value, char *input, int size, void *extra)
 {
 struct keyword *k;
 char	*str;
@@ -111,49 +186,29 @@ int	isTypedef;
 	
 	if(((xParserExtraDataType *)extra)->struct_or_union_name_escope == 0){
 		if(isTypedef = symbolTableGetType(((xParserExtraDataType *)extra)->syms, str)){
-			//fprintf(stderr,"Typedef detected: %s\n", str);
+			fprintf(stderr,"Typedef detected: %s\n", str);
 			return TYPEDEF_NAME;
 		}
 	}
 
-	//fprintf(stderr,"Identifier detected: %s\n", str);
+	fprintf(stderr,"Identifier detected: %s\n", str);
 	return IDENTIFIER;
 }
 
-// Old approch, mistaken "inta;" by "int a;"
+int static savemarker(xParserType *value, void *extra)
+{
+xParserExtraDataType	*e = (xParserExtraDataType *)extra;
+
+	value->file = e->file;
+	value->lnumber = e->lnumber;
+}
+
+// Old approch for keyword, mistaken "inta;" by "int a;"
 //auto			: value->str = nrDupToken(input,size); return AUTO;
 //double		: value->str = nrDupToken(input,size); return DOUBLE;
 //int			: value->str = nrDupToken(input,size); return INT;
 //struct		: value->str = nrDupToken(input,size); return STRUCT;
-//break			: value->str = nrDupToken(input,size); return BREAK;
-//else			: value->str = nrDupToken(input,size); return ELSE;
-//long			: value->str = nrDupToken(input,size); return LONG;
-//switch		: value->str = nrDupToken(input,size); return SWITCH;
-//case			: value->str = nrDupToken(input,size); return CASE;
-//enum			: value->str = nrDupToken(input,size); return ENUM;
-//register		: value->str = nrDupToken(input,size); return REGISTER;
-//typedef		: value->str = nrDupToken(input,size); return TYPEDEF;
-//char			: value->str = nrDupToken(input,size); return CHAR;
-//extern		: value->str = nrDupToken(input,size); return EXTERN;
-//return		: value->str = nrDupToken(input,size); return RETURN;
-//union			: value->str = nrDupToken(input,size); return UNION;
-//const			: value->str = nrDupToken(input,size); return CONST;
-//float			: value->str = nrDupToken(input,size); return FLOAT;
-//short			: value->str = nrDupToken(input,size); return SHORT;
-//unsigned		: value->str = nrDupToken(input,size); return UNSIGNED;
-//continue		: value->str = nrDupToken(input,size); return CONTINUE;
-//for			: value->str = nrDupToken(input,size); return FOR;
-//signed		: value->str = nrDupToken(input,size); return SIGNED;
-//void			: value->str = nrDupToken(input,size); return VOID;
-//default		: value->str = nrDupToken(input,size); return DEFAULT;
-//goto			: value->str = nrDupToken(input,size); return GOTO;
-//sizeof		: value->str = nrDupToken(input,size); return SIZEOF;
-//volatile		: value->str = nrDupToken(input,size); return VOLATILE;
-//do			: value->str = nrDupToken(input,size); return DO;
-//if			: value->str = nrDupToken(input,size); return IF;
-//static		: value->str = nrDupToken(input,size); return STATIC;
-//while			: value->str = nrDupToken(input,size); return WHILE;
-
+//...
 
 %%x_lex xParserType
 
@@ -169,91 +224,92 @@ int	isTypedef;
 %define F	flFL
 %define L	uUlL
 
-\D\D*\.\D*\E\S\D\D*\F	: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\D\D*\.\D*\E\S\D\D*	: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\.\D*\E\S\D\D*\F	: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\.\D*\E\S\D\D*		: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\D\D*\.\D\F		: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\D\D*\.\D		: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\.\D\D*\F		: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\.\D\D*			: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\.\D\D*\F		: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\D\D*\.\D*\E\S\D\D*\F	: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\D\D*\.\D*\E\S\D\D*	: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\.\D*\E\S\D\D*\F	: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\.\D*\E\S\D\D*		: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\D\D*\.\D\F		: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\D\D*\.\D		: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\.\D\D*\F		: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\.\D\D*			: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\.\D\D*\F		: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
 
-\D\D*f			: value->str = nrDupToken(input,size); return FLOAT_CONST;
-\D\D*F			: value->str = nrDupToken(input,size); return FLOAT_CONST;
+\D\D*f			: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
+\D\D*F			: value->str = nrDupToken(input,size); savemarker(value, extra); return FLOAT_CONST;
 
-0x\H\H*\L		: value->str = nrDupToken(input,size); return INTEGER_CONST;
-0x\H\H*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
-0X\H\H*\L		: value->str = nrDupToken(input,size); return INTEGER_CONST;
-0X\H\H*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
-0\O\O*\L		: value->str = nrDupToken(input,size); return INTEGER_CONST;
-0\O\O*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
-\N\D*\L			: value->str = nrDupToken(input,size); return INTEGER_CONST;
-\N\D*			: value->str = nrDupToken(input,size); return INTEGER_CONST;
-0			: value->str = nrDupToken(input,size); return INTEGER_CONST;
+0x\H\H*\L		: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+0x\H\H*			: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+0X\H\H*\L		: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+0X\H\H*			: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+0\O\O*\L		: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+0\O\O*			: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+\N\D*\L			: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+\N\D*			: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
+0			: value->str = nrDupToken(input,size); savemarker(value, extra); return INTEGER_CONST;
 
 
-'			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST;
-L'			: value->str = getString(input, cursor, '\\', '\''); return CHARACTER_CONST;
+'			: value->str = getString(input, cursor, '\\', '\''); savemarker(value, extra); return CHARACTER_CONST;
+L'			: value->str = getString(input, cursor, '\\', '\''); savemarker(value, extra); return CHARACTER_CONST;
 
-"			: value->str = getString(input, cursor, '\\', '\"'); return STRING;
-L"			: value->str = getString(input, cursor, '\\', '\"'); return STRING;
+"			: value->str = getString(input, cursor, '\\', '\"'); savemarker(value, extra); return STRING;
+L"			: value->str = getString(input, cursor, '\\', '\"'); savemarker(value, extra); return STRING;
 
-\i\I*			: return processIdentifier(value, input, size, extra);
+\i\I*			: savemarker(value, extra); return processIdentifier(value, input, size, extra);
 
-sizeof			: value->str = nrDupToken(input,size); return SIZEOF;
-[			: value->str = nrDupToken(input,size); return OB;
-]			: value->str = nrDupToken(input,size); return CB;
-(			: value->str = nrDupToken(input,size); return OP;
-)			: value->str = nrDupToken(input,size); return CP;
-*=			: value->str = nrDupToken(input,size); return ASSIGN_MUL;
-/=			: value->str = nrDupToken(input,size); return ASSIGN_DIV;
-%=			: value->str = nrDupToken(input,size); return ASSIGN_MOD;
-+=			: value->str = nrDupToken(input,size); return ASSIGN_ADD;
--=			: value->str = nrDupToken(input,size); return ASSIGN_SUB;
-<<=			: value->str = nrDupToken(input,size); return ASSIGN_SHFL;
->>=			: value->str = nrDupToken(input,size); return ASSIGN_SHFR;
-&=			: value->str = nrDupToken(input,size); return ASSIGN_AND;
-^=			: value->str = nrDupToken(input,size); return ASSIGN_NEG;
-|=			: value->str = nrDupToken(input,size); return ASSIGN_OR;
+[			: value->str = nrDupToken(input,size); savemarker(value, extra); return OB;
+]			: value->str = nrDupToken(input,size); savemarker(value, extra); return CB;
+(			: value->str = nrDupToken(input,size); savemarker(value, extra); return OP;
+)			: value->str = nrDupToken(input,size); savemarker(value, extra); return CP;
+*=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_MUL;
+/=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_DIV;
+%=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_MOD;
++=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_ADD;
+-=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_SUB;
+<<=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_SHFL;
+>>=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_SHFR;
+&=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_AND;
+^=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_NEG;
+|=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN_OR;
 
-<<			: value->str = nrDupToken(input,size); return SHIFTLEFT;
->>			: value->str = nrDupToken(input,size); return SHIFTRIGHT;
-<=			: value->str = nrDupToken(input,size); return CMP_LE;
->=			: value->str = nrDupToken(input,size); return CMP_GE;
-==			: value->str = nrDupToken(input,size); return CMP_EQ;
-!=			: value->str = nrDupToken(input,size); return CMP_NE;
-<			: value->str = nrDupToken(input,size); return CMP_LT;
->			: value->str = nrDupToken(input,size); return CMP_GT;
+<<			: value->str = nrDupToken(input,size); savemarker(value, extra); return SHIFTLEFT;
+>>			: value->str = nrDupToken(input,size); savemarker(value, extra); return SHIFTRIGHT;
+<=			: value->str = nrDupToken(input,size); savemarker(value, extra); return CMP_LE;
+>=			: value->str = nrDupToken(input,size); savemarker(value, extra); return CMP_GE;
+==			: value->str = nrDupToken(input,size); savemarker(value, extra); return CMP_EQ;
+!=			: value->str = nrDupToken(input,size); savemarker(value, extra); return CMP_NE;
+<			: value->str = nrDupToken(input,size); savemarker(value, extra); return CMP_LT;
+>			: value->str = nrDupToken(input,size); savemarker(value, extra); return CMP_GT;
 
-->			: value->str = nrDupToken(input,size); return ARROW;
-++			: value->str = nrDupToken(input,size); return INC;
---			: value->str = nrDupToken(input,size); return DEC;
-&&			: value->str = nrDupToken(input,size); return LOG_AND;
-||			: value->str = nrDupToken(input,size); return LOG_OR;
-*			: value->str = nrDupToken(input,size); return STAR;
-+			: value->str = nrDupToken(input,size); return PLUS;
--			: value->str = nrDupToken(input,size); return MINUS;
-~			: value->str = nrDupToken(input,size); return NEG;
-!			: value->str = nrDupToken(input,size); return LOG_NOT;
-/			: value->str = nrDupToken(input,size); return DIV;
-%			: value->str = nrDupToken(input,size); return MODULE;
-^			: value->str = nrDupToken(input,size); return BIT_EOR;
-&			: value->str = nrDupToken(input,size); return AMPERSAND;
-|			: value->str = nrDupToken(input,size); return BIT_OR;
-?			: value->str = nrDupToken(input,size); return TERNARY;
-\:			: value->str = nrDupToken(input,size); return COLON;
-=			: value->str = nrDupToken(input,size); return ASSIGN;
-,			: value->str = nrDupToken(input,size); return COMMA;
+->			: value->str = nrDupToken(input,size); savemarker(value, extra); return ARROW;
+++			: value->str = nrDupToken(input,size); savemarker(value, extra); return INC;
+--			: value->str = nrDupToken(input,size); savemarker(value, extra); return DEC;
+&&			: value->str = nrDupToken(input,size); savemarker(value, extra); return LOG_AND;
+||			: value->str = nrDupToken(input,size); savemarker(value, extra); return LOG_OR;
+*			: value->str = nrDupToken(input,size); savemarker(value, extra); return STAR;
++			: value->str = nrDupToken(input,size); savemarker(value, extra); return PLUS;
+-			: value->str = nrDupToken(input,size); savemarker(value, extra); return MINUS;
+~			: value->str = nrDupToken(input,size); savemarker(value, extra); return NEG;
+!			: value->str = nrDupToken(input,size); savemarker(value, extra); return LOG_NOT;
+/			: value->str = nrDupToken(input,size); savemarker(value, extra); return DIV;
+%			: value->str = nrDupToken(input,size); savemarker(value, extra); return MODULE;
+^			: value->str = nrDupToken(input,size); savemarker(value, extra); return BIT_EOR;
+&			: value->str = nrDupToken(input,size); savemarker(value, extra); return AMPERSAND;
+|			: value->str = nrDupToken(input,size); savemarker(value, extra); return BIT_OR;
+?			: value->str = nrDupToken(input,size); savemarker(value, extra); return TERNARY;
+\:			: value->str = nrDupToken(input,size); savemarker(value, extra); return COLON;
+=			: value->str = nrDupToken(input,size); savemarker(value, extra); return ASSIGN;
+,			: value->str = nrDupToken(input,size); savemarker(value, extra); return COMMA;
 
-{			: value->str = nrDupToken(input,size); return OBLOCK;
-}			: value->str = nrDupToken(input,size); return CBLOCK;
-;			: value->str = nrDupToken(input,size); return SEMICOLON;
-\.\.\.			: value->str = nrDupToken(input,size); return ELLIPSIS;
-\.			: value->str = nrDupToken(input,size); return DOT;
+{			: value->str = nrDupToken(input,size); savemarker(value, extra); return OBLOCK;
+}			: value->str = nrDupToken(input,size); savemarker(value, extra); return CBLOCK;
+;			: value->str = nrDupToken(input,size); savemarker(value, extra); return SEMICOLON;
+\.\.\.			: value->str = nrDupToken(input,size); savemarker(value, extra); return ELLIPSIS;
+\.			: value->str = nrDupToken(input,size); savemarker(value, extra); return DOT;
 
 \s			: 
 \n			: 
 \t			: 
 \r			: 
+
+#			: processHashLines(value, input, cursor, extra);
 

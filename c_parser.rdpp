@@ -40,14 +40,14 @@ Tree t;
 int  i;
 
 	if(result->t==NULL)
-		t = treeNew(nt_id, "nt");
+		t = treeNew(nt_id, "nt", NULL, 0);
 	else
 		t = result->t;
 
 	if((result->t == NULL) || (result->t != NULL && start>0)){
 		for(i=start; i<end; i++){
 			if(types[i] < RDPP_NONTERMINAL_START){
-				treeAddChild(t, treeNew(types[i], terms[i].str));
+				treeAddChild(t, treeNew(types[i], terms[i].str, terms[i].file, terms[i].lnumber));
 			}else{
 				treeAddChild(t, terms[i].t);
 			}
@@ -65,6 +65,8 @@ struct {
 	Tree	t;
 	char	*str;
 	int	st_class;
+	char	*file;
+	int	lnumber;
 }
 %%
 
@@ -77,6 +79,8 @@ struct {
         	SymbolTable     syms;
 		int		struct_or_union_name_escope;
 		int		level;
+		char		*file;
+		int		lnumber;
 	}
 }
 
@@ -365,6 +369,8 @@ constant_expression:
 #
 #          function-definition:
 #                  declaration-specifiers<opt> declarator declaration-list<opt> compound-statement
+#
+#   Included simples-asm-expr from GNU to support glibc header files
 
 declaration:
 	{typedefFlag = 0;}
@@ -386,10 +392,10 @@ declaration_specifier:
 	storage_class_specifier { result.st_class = terms[0].st_class; }
 	| type_specifier { result.st_class = terms[0].st_class; }
 	| type_qualifier { result.st_class = terms[0].st_class; }
-	| function_specifier     # C99 inline
+	| function_specifier { result.st_class = terms[0].st_class; }   # c99 inline
 	;
 
-function_specifier:
+function_specifier: # C99 inline
 	INLINE
 	;
 
@@ -403,12 +409,21 @@ init_declarator_list:
 	;
 
 init_declarator:
-	declarator init_declarator_assignment
+	declarator simple_asm_expr init_declarator_assignment
 	;
 
 init_declarator_assignment:
 	ASSIGN initializer
 	|
+	;
+
+simple_asm_expr:
+	ASM OP string_literal CP
+	|
+	;
+
+string_literal:
+	STRING [ STRING ]
 	;
 
 #3.5.1 Storage-class specifiers

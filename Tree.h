@@ -9,9 +9,11 @@ struct tree{
 	Tree	*child;
 	int	n_child;
 	int	n_child_allocated;
+	char	*file;
+	int	lnumber;
 };
 
-Tree treeNew(int type, char *value);
+Tree treeNew(int type, char *value, char *file, int lnumber);
 int treeAddChild(Tree t, Tree child);
 Tree treeReduceToMinimal(Tree t, int nt_start);
 int treePrint(Tree t, FILE *fp, int level);
