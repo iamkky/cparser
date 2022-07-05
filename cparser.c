@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "Symbol.h"
 #include "Tree.h"
+#include "TreeIterator.h"
 #include "c_parser.h"
+#include "c_parser_tools.h"
 
 char *readToBuffer(int fd, int inisize, int extrasize, int *readsize)
 {
@@ -34,6 +37,25 @@ char *buffer, *tmp;
 	return buffer;
 }
 
+
+int iteratorTest(Tree root)
+{
+TreeIterator it;
+Tree i;
+
+	treeFixParents(root, NULL);
+
+	it = treeIteratorNew();
+	
+	i = treeIteratorBeginPreorder(it, root);
+	while(i){
+		printNodeValue(i->nodevalue, stdout, it->level);	
+		fprintf(stdout, "\n");
+
+		i = treeIteratorNextPreorder(it);
+	}	
+}
+
 int main(int argc, char **argv)
 {
 //CxValue  json;
@@ -49,6 +71,8 @@ xParserExtraDataType extra;
 	extra.syms = symbolTableNew(500);
 	extra.struct_or_union_name_escope = 0;
 	extra.level = 0;
+	extra.file = strdup("<stdin>");
+
 	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
 
 	x = xParserNew(buffer, &extra);	
@@ -66,23 +90,21 @@ xParserExtraDataType extra;
 		fprintf(stderr,"Success to parse line\n\n");
 
 		fprintf(stdout,"\nResult:\n");
-		treePrint(x->value[0].t, stdout, 2);
+		treePrintChildreenCount(x->value[0].t, stdout, 2, printNodeValue);
 		fprintf(stdout,"\n");
 
-/*
-		fprintf(stdout,"Result (only tokens):\n");
-		treePrintToken(x->value[0].t, stdout, 2, RDPP_NONTERMINAL_START);
-		fprintf(stdout,"\n\n");
-*/
-	
-		x->value[0].t = treeReduceToMinimal(x->value[0].t, RDPP_NONTERMINAL_START);
+		fprintf(stdout,"\nResult: ========================\n");
+		iteratorTest(x->value[0].t);
+		fprintf(stdout,"\nEnd:    ========================\n");
+
+		x->value[0].t = treeReduceToMinimal(x->value[0].t, isRemovable);
 
 		fprintf(stdout,"Result (reduced 1):\n");
-		treePrint(x->value[0].t, stdout, 2);
+		treePrintChildreenCount(x->value[0].t, stdout, 2, printNodeValue);
 		fprintf(stdout,"\n\n");
 
 		fprintf(stdout,"Result (only tokens):\n");
-		treePrintToken(x->value[0].t, stdout, 2, RDPP_NONTERMINAL_START);
+		treePrint(x->value[0].t, stdout, 2, printNodeValueOnlyToken);
 		fprintf(stdout,"\n\n");
 
 		//list = x->value[0].complist;

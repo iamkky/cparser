@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "common.h"
+
 #include "Tree.h"
 #include "Symbol.h"
 
@@ -28,7 +30,6 @@ int	r;
 	return r;
 }
  
-
 void static safe_free(void *ptr)
 {
 	if(ptr) free(ptr);
@@ -39,15 +40,18 @@ int default_action(xParser self, xParserType *result, xParserType *terms, int *t
 Tree t;
 int  i;
 
-	if(result->t==NULL)
-		t = treeNew(nt_id, "nt", NULL, 0);
-	else
+	if(result->t==NULL){
+		result->info.is_token = 0;
+		result->info.id = nt_id;
+		t = treeNew(memdup(&(result->info),sizeof(result->info)));
+	}else{
 		t = result->t;
+	}
 
 	if((result->t == NULL) || (result->t != NULL && start>0)){
 		for(i=start; i<end; i++){
 			if(types[i] < RDPP_NONTERMINAL_START){
-				treeAddChild(t, treeNew(types[i], terms[i].str, terms[i].file, terms[i].lnumber));
+				treeAddChild(t, treeNew(memdup(&(terms[i].info),sizeof(terms[i].info))));
 			}else{
 				treeAddChild(t, terms[i].t);
 			}
@@ -59,14 +63,18 @@ int  i;
 
 static int typedefFlag = 0;
 
-
 %%xParser top x_lex
 struct {
 	Tree	t;
-	char	*str;
 	int	st_class;
-	char	*file;
-	int	lnumber;
+
+	struct symbol_info {
+		int	is_token;
+		int	id;
+		char	*str;
+		char	*file;
+		int	lnumber;
+	} info;
 }
 %%
 
@@ -75,7 +83,7 @@ struct {
 %%names
 
 %%extra {
-	struct cparser_extra{
+	struct cparser_extra {
         	SymbolTable     syms;
 		int		struct_or_union_name_escope;
 		int		level;
@@ -677,7 +685,7 @@ direct_or_abstract_declarator:
 	IDENTIFIER 			
 		{ 
 			if(typedefFlag){
-				symbolTableRegister((self->extra)->syms, terms[0].str, 1);
+				symbolTableRegister((self->extra)->syms, terms[0].info.str, 1);
 				typedefFlag = 0;
 			}
 		}

@@ -2,12 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "Tree.h"
-#include "c_parser.tokens.h"
 
-#define NO_ANSITERM
-#include "ansiterm.h" 
-
-Tree treeNew(int type, char *value, char *file, int lnumber)
+Tree treeNew(void *nodevalue)
 {
 Tree self;
 int i;
@@ -18,12 +14,10 @@ int i;
 		exit(-1);
 	}
 
-	self->type = type ;
-	self->value = value ? strdup(value) : NULL;
+	self->nodevalue = nodevalue;
+
 	self->n_child = 0;
 	self->n_child_allocated = 128;
-	self->file = file;
-	self->lnumber = lnumber;
 
 	if((self->child = malloc(sizeof(Tree) * self->n_child_allocated))==NULL){
 		free(self);
@@ -31,6 +25,50 @@ int i;
 	}
 
 	return self;
+}
+
+Tree treeGetFirstChild(Tree self)
+{
+	if(self==NULL) return NULL;
+
+	if(self->n_child>0) return self->child[0];
+
+	return NULL;
+}
+
+int treeIsLastChild(Tree self, Tree child)
+{
+	if(self==NULL) return 0;
+
+	if(self->n_child==0) return 0;
+	if(child == self->child[self->n_child-1]) return 1;
+
+	return 0;
+}
+
+int treeWhichChild(Tree self, Tree child)
+{
+int c;
+
+	if(self==NULL) return -2;
+	
+	for(c=0; c<self->n_child; c++){
+		if(child == self->child[c]) return c;
+	}
+
+	return -1;
+}
+
+Tree treeGetNextChild(Tree self, Tree child)
+{
+int c;
+
+	if(self==NULL) return NULL;
+
+	if(self->n_child == 0) return NULL;
+	if((c = treeWhichChild(self, child)) < self->n_child - 1) return self->child[c+1];
+
+	return NULL;
 }
 
 int treeAddChild(Tree self, Tree child)
@@ -52,7 +90,42 @@ int i;
 	return 0;
 }
 
-Tree treeReduceToMinimal(Tree self, int nt_start)
+int treeFixParents(Tree self, Tree parent)
+{
+int i;
+
+	if(self==NULL){
+		fprintf(stderr,"treeAddChild: Null exception\n");
+		return -1;
+	}
+
+	self->parent = parent;
+	for(i=0; i<self->n_child; i++){
+		if(self->child[i]) treeFixParents(self->child[i], self);
+	}
+	return 0;
+}
+
+int treeGetChildCount(Tree self)
+{
+	if(self==NULL) return -1;
+	return self->n_child;	
+}
+
+Tree treeGetChild(Tree self, int n)
+{
+	if(self==NULL) return NULL;
+	if(n >= self->n_child) return NULL;
+	return self->child[n];	
+}
+
+void *treeGetNodeValue(Tree self)
+{
+	if(self==NULL) return NULL;
+	return self->nodevalue;	
+}
+
+Tree treeReduceToMinimal(Tree self, int (*isRemovable_fn)(void *))
 {
 Tree taux;
 int i, c;
@@ -60,21 +133,22 @@ int i, c;
 	if(self==NULL) return NULL;
 	for(c=i=0; i<self->n_child; i++){
 		if(self->child[i] == NULL) continue;
-		taux = treeReduceToMinimal(self->child[i], nt_start);
+		taux = treeReduceToMinimal(self->child[i], isRemovable_fn);
 		if(taux) self->child[c++] = taux;
 	}
 	self->n_child = c;
 	
-	if(self->type>= nt_start && self->n_child==0){
+	if(isRemovable_fn(self->nodevalue) && self->n_child==0){
 		return NULL;
 	}
-	if(self->type>= nt_start && self->n_child==1){
+
+	if(isRemovable_fn(self->nodevalue) && self->n_child==1){
 		return self->child[0];
 	}
 	return self;
 }
 
-int treePrint(Tree self, FILE *fp, int level)
+int treePrintChildreenCount(Tree self, FILE *fp, int level, int (*print_fn)(void *, FILE *, int))
 {
 int c, i;
 	
@@ -82,47 +156,31 @@ int c, i;
 		fprintf(stderr,"Tree node null reached\n");
 		return -1;
 	}
-	for(c=0; c<level; c++){
-		fprintf(fp," ");
-	}
-	if(self->type>=10000){
-		fprintf(fp, ANSIBOLD ANSIGREEN "%s[%d]" ANSIRESET,
-			Rdpp_xParserNonterminals_Names[self->type-10000], self->type);
-	}else{
-		fprintf(fp, ANSIBOLD ANSIBLUE "%s[%d] value:[[" ANSIRED "%s" ANSIBLUE "]]" ANSIRESET " file:%s, line:%d",
-			Rdpp_xParserTerminals_Names[self->type-1000], self->type, self->value, self->file, self->lnumber);
-	}
-	fprintf(fp,", p:%p", self);
+
+	print_fn(self->nodevalue, fp, level);
 	fprintf(fp,", childreen:%d", self->n_child);
 	fprintf(fp,"\n");
+
 	for(i=0; i<self->n_child; i++){
-		if(self->child[i]) treePrint(self->child[i], fp, level+2);
+		if(self->child[i]) treePrintChildreenCount(self->child[i], fp, level+2, print_fn);
 	}
 
 	return 0;
 }
 
-int treePrintToken(Tree t, FILE *fp, int level, int non_terminal_start)
+int treePrint(Tree self, FILE *fp, int level, int (*print_fn)(void *, FILE *, int))
 {
 int c, i;
 	
-	if(t==NULL){
+	if(self==NULL){
 		fprintf(stderr,"Tree node null reached\n");
 		return -1;
 	}
-	if(t->type<non_terminal_start){
-		for(c=0; c<level; c++){
-			fprintf(fp," ");
-		}
-		if(t->type == STRING){
-			fprintf(fp,"\"%s\"", t->value);
-		}else{
-			fprintf(fp,"%s", t->value);
-		}
-		fprintf(fp,"\n");
-	}
-	for(i=0; i<t->n_child; i++){
-		if(t->child[i]) treePrintToken(t->child[i], fp, level+2, non_terminal_start);
+
+	print_fn(self->nodevalue, fp, level);
+
+	for(i=0; i<self->n_child; i++){
+		if(self->child[i]) treePrint(self->child[i], fp, level+2, print_fn);
 	}
 
 	return 0;

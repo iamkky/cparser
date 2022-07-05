@@ -1,22 +1,35 @@
 #ifndef _TREE_H_
 #define _TREE_H_
 
+#include <stdio.h>
+
 typedef struct tree *Tree;
 
 struct tree{
-	int	type;
-	char	*value;
+	void	*nodevalue;
 	Tree	*child;
 	int	n_child;
 	int	n_child_allocated;
-	char	*file;
-	int	lnumber;
+	Tree	parent;
 };
 
-Tree treeNew(int type, char *value, char *file, int lnumber);
-int treeAddChild(Tree t, Tree child);
-Tree treeReduceToMinimal(Tree t, int nt_start);
-int treePrint(Tree t, FILE *fp, int level);
-int treePrintToken(Tree t, FILE *fp, int level, int non_terminal_start);
+Tree	treeNew(void *nodevalue);
+int	treeAddChild(Tree t, Tree child);
+
+Tree	treeGetFirstChild(Tree self);
+int	treeIsLastChild(Tree self, Tree child);
+Tree	treeGetNextChild(Tree self, Tree child);
+
+int	treeFixParents(Tree self, Tree parent);
+
+int	treeGetChildCount(Tree self);
+Tree	treeGetChild(Tree self, int n);
+void	*treeGetNodeVata(Tree self);
+
+int	treeSetParent(Tree self, Tree parent);
+
+Tree	treeReduceToMinimal(Tree t, int (*isRemovable_fn)(void *nodevalue));
+int	treePrintChildreenCount(Tree t, FILE *fp, int level, int (*print_fn)(void *, FILE *, int));
+int	treePrint(Tree t, FILE *fp, int level, int (*print_fn)(void *, FILE *, int));
 
 #endif
