@@ -132,7 +132,7 @@ int			number = 0, c = 0;
 	while(*input!=0 && *input!='\n') input++;
 	(*cursor)+=(input - p);
 
-	fprintf(stderr,"#LINE %d %s\n", number, file);
+	//fprintf(stderr,"#LINE %d %s\n", number, file);
 
 	e = (xParserExtraDataType *)extra;
 
@@ -161,7 +161,7 @@ int	lineno;
 	}
 
 	tmp = nrDupToken(input, count);
-	fprintf(stderr,"#LINE:%s\n", tmp);
+	fprintf(stderr,"Hashline unprocessed: %s\n", tmp);
 	free(tmp);
 	
 	(*cursor)+=count;

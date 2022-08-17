@@ -9,6 +9,18 @@
 #include "c_parser.h"
 #include "c_parser_tools.h"
 
+struct options {
+	char *gencode_filename;
+	char *tree_filename;
+	char *reduced_tree_filename;
+	char *symbols_filename;
+} options = {
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
 char *readToBuffer(int fd, int inisize, int extrasize, int *readsize)
 {
 int bsize, r, rsize;
@@ -56,19 +68,70 @@ Tree i;
 	}	
 }
 
+static void missingParameter(char *option)
+{
+	fprintf(stderr,"Missing parameter for options %s\n", option);
+	exit(-1);
+}
+
+int get_options(int argc, char **argv, struct options *options)
+{
+int argcount = 1;
+
+	while(argcount<argc){
+		if(!strcmp(argv[argcount], "-c")){
+			if(++argcount==argc) missingParameter("-c");
+			options->gencode_filename = argv[argcount++];
+			continue;
+		}
+		if(!strcmp(argv[argcount], "-t")){
+			if(++argcount==argc) missingParameter("-t");
+			options->tree_filename = argv[argcount++];
+			continue;
+		}
+		if(!strcmp(argv[argcount], "-r")){
+			if(++argcount==argc) missingParameter("-r");
+			options->reduced_tree_filename = argv[argcount++];
+			continue;
+		}
+		if(!strcmp(argv[argcount], "-s")){
+			if(++argcount==argc) missingParameter("-s");
+			options->symbols_filename = argv[argcount++];
+			continue;
+		}
+		fprintf(stderr,"know command line parameter: %s\n", argv[argcount]);
+		exit(-1);
+	}
+
+	return argcount;
+}
+
+FILE *openOutputFile(char *filename)
+{
+FILE *fp;
+
+	if((fp = fopen(filename,"w"))==NULL){
+		fprintf(stderr,"Could not open output file %s\n", options.tree_filename);
+		exit(-1);
+	}
+
+	return fp;
+}
+
 int main(int argc, char **argv)
 {
-//CxValue  json;
-xParser x;
-char *buffer;
-int bytes, result;
-xParserExtraDataType extra;
+xParserExtraDataType	extra;
+xParser			x;
+FILE	*fp_code, *fp_tree, *fp_reduced_tree, *fp_symbols;
+char	*buffer;
+int	bytes, result;
 
-	//bytes = read(0, buffer, 32767);
+	get_options(argc, argv, &options);
+
 	buffer = readToBuffer(0, 32768, 1, &bytes);
 	buffer[bytes] = 0;
 	
-	extra.syms = symbolTableNew(500);
+	extra.syms = symbolTableNew(2000);
 	extra.struct_or_union_name_escope = 0;
 	extra.level = 0;
 	extra.file = strdup("<stdin>");
@@ -83,38 +146,32 @@ xParserExtraDataType extra;
 	fprintf(stdout,"cursor: %d\n", x->cursor);
 	fprintf(stdout,"Last Token: %d\n", x->currToken);
 	fprintf(stdout,"\n");
-	fprintf(stdout,"Symbol Table:\n");
-	symbolTablePrint(extra.syms, stdout);
+	
+	if(options.symbols_filename && (fp_symbols = openOutputFile(options.symbols_filename))){
+		symbolTablePrint(extra.syms, fp_symbols);
+	}
 
 	if(result>0){
-		fprintf(stderr,"Success to parse line\n\n");
-
-		fprintf(stdout,"\nResult:\n");
-		treePrintChildreenCount(x->value[0].t, stdout, 2, printNodeValue);
-		fprintf(stdout,"\n");
-
-		fprintf(stdout,"\nResult: ========================\n");
-		iteratorTest(x->value[0].t);
-		fprintf(stdout,"\nEnd:    ========================\n");
+		if(options.tree_filename && (fp_tree = openOutputFile(options.tree_filename))){
+			//iteratorTest(x->value[0].t);
+			treePrintChildreenCount(x->value[0].t, fp_tree, 2, printNodeValue);
+			fclose(fp_tree);
+		}
 
 		x->value[0].t = treeReduceToMinimal(x->value[0].t, isRemovable);
 
-		fprintf(stdout,"Result (reduced 1):\n");
-		treePrintChildreenCount(x->value[0].t, stdout, 2, printNodeValue);
-		fprintf(stdout,"\n\n");
+		if(options.reduced_tree_filename && (fp_reduced_tree = openOutputFile(options.reduced_tree_filename))){
+			treePrintChildreenCount(x->value[0].t, fp_reduced_tree, 2, printNodeValue);
+			fclose(fp_reduced_tree);
+		}
 
-		fprintf(stdout,"Result (only tokens):\n");
-		treePrint(x->value[0].t, stdout, 2, printNodeValueOnlyToken);
-		fprintf(stdout,"\n\n");
-
-		//list = x->value[0].complist;
-		//fprintf(stdout,"\nPrint:\n");
-		//xComponentListPrint(list, stdout, 0);
-		//fprintf(stdout,"\nCode:\n");
-		//cxComponentListGenCode(list, stdout, 0);
-		//fprintf(stdout,";\n");
+		if(options.gencode_filename && (fp_code = openOutputFile(options.gencode_filename))){
+			treePrint(x->value[0].t, fp_code, 2, printNodeValueOnlyToken);
+			fclose(fp_code);
+		}
 	}else{
 		fprintf(stderr,"Failed to parse!\n");
+		exit(-1);
 	}
 	
 

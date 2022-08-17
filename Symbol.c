@@ -17,6 +17,8 @@ SymbolTable self;
 
 	self->size = 0;
 	self->allocated = size;
+
+	return self;
 }
 
 int symbolTableRegister(SymbolTable self, char *name, int type)

@@ -27,13 +27,28 @@ int i;
 	return self;
 }
 
-Tree treeGetFirstChild(Tree self)
+int treeGetChildCount(Tree self)
+{
+	if(self==NULL) return -1;
+	return self->n_child;	
+}
+
+Tree treeGetChild(Tree self, int n)
 {
 	if(self==NULL) return NULL;
+	if(n >= self->n_child) return NULL;
+	return self->child[n];	
+}
 
-	if(self->n_child>0) return self->child[0];
+void *treeGetNodeValue(Tree self)
+{
+	if(self==NULL) return NULL;
+	return self->nodevalue;	
+}
 
-	return NULL;
+Tree treeGetFirstChild(Tree self)
+{
+	return treeGetChild(self, 0);
 }
 
 int treeIsLastChild(Tree self, Tree child)
@@ -66,7 +81,7 @@ int c;
 	if(self==NULL) return NULL;
 
 	if(self->n_child == 0) return NULL;
-	if((c = treeWhichChild(self, child)) < self->n_child - 1) return self->child[c+1];
+	if((c = treeWhichChild(self, child)) < self->n_child - 1) return self->child[c + 1];
 
 	return NULL;
 }
@@ -79,7 +94,7 @@ int i;
 		fprintf(stderr,"treeAddChild: Null exception\n");
 		return -1;
 	}
-	if(self->n_child>=self->n_child_allocated){
+	if(self->n_child >= self->n_child_allocated){
 		if((self->child = realloc(self->child, sizeof(Tree) * 2 * self->n_child_allocated))==NULL){
 			return -1;
 		}
@@ -104,25 +119,6 @@ int i;
 		if(self->child[i]) treeFixParents(self->child[i], self);
 	}
 	return 0;
-}
-
-int treeGetChildCount(Tree self)
-{
-	if(self==NULL) return -1;
-	return self->n_child;	
-}
-
-Tree treeGetChild(Tree self, int n)
-{
-	if(self==NULL) return NULL;
-	if(n >= self->n_child) return NULL;
-	return self->child[n];	
-}
-
-void *treeGetNodeValue(Tree self)
-{
-	if(self==NULL) return NULL;
-	return self->nodevalue;	
 }
 
 Tree treeReduceToMinimal(Tree self, int (*isRemovable_fn)(void *))
