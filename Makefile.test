@@ -1,4 +1,0 @@
-
-include make.cpcs.inc
-
-all: Tree.o

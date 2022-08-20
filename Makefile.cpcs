@@ -1,0 +1,5 @@
+
+include make.cpcs.inc
+
+include Makefile
+#all: common.o

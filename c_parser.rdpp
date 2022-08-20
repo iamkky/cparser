@@ -111,6 +111,14 @@ enumeration_constant:
 	;
 
 # 3.3.1 Primary expressions
+#          
+#          primary-expression:
+#                  identifier
+#                  constant
+#                  string-literal
+#                  (  expression )
+#
+
 primary_expression:
 	IDENTIFIER
 	| constant
@@ -119,6 +127,21 @@ primary_expression:
 	;
 
 # 3.3.2 Postfix operators
+#
+#          postfix-expression:
+#                  primary-expression
+#                  postfix-expression [  expression ] 
+#                  postfix-expression (  argument-expression-list<opt> ) 
+#                  postfix-expression .   identifier
+#                  postfix-expression ->  identifier
+#                  postfix-expression ++ 
+#                  postfix-expression --
+#
+#          argument-expression-list:
+#                  assignment-expression
+#                  argument-expression-list ,  assignment-expression
+#
+
 postfix_expression:
 	primary_expression postfix_expression_lr
 	;
@@ -143,6 +166,19 @@ argument_expression_list:
 	;
 
 # 3.3.3 Unary operators
+#
+#          unary-expression:
+#                  postfix-expression
+#                  ++  unary-expression
+#                  --  unary-expression
+#                  unary-operator cast-expression
+#                  sizeof  unary-expression
+#                  sizeof (  type-name )
+#
+#          unary-operator: one of
+#                  &  *  +  -  ~  !
+#
+
 unary_expression:
 	  postfix_expression
 	| INC unary_expression
@@ -158,7 +194,7 @@ unary_expression_disambiguation:
 
 unary_operator:
 	  AMPERSAND
-	| START
+	| STAR
 	| PLUS
 	| MINUS
 	| NEG
@@ -166,6 +202,11 @@ unary_operator:
 	;
 
 # 3.3.4 Cast operators
+#
+#          cast-expression:
+#                  unary-expression
+#                  ( type-name )  cast-expression
+#
 #
 # first(OP type_name CP cast_expression) includes '('
 # first(unary_expression) also includes '('
@@ -175,11 +216,15 @@ unary_operator:
 #    first(postfix_expression) = first(primary_expression)
 #    first(primary_expression) = { first(id), first(constant), first(STRING), '(' }
 #
+#    than:
+#    first(unary_expression) = { first(id), first(constant), first(STRING), '(', INC, DEC, unary_operator, SIZEOF }
+#
 #cast_expression:
 #	OP type_name CP cast_expression
 #	| unary_expression
 #	;
 #
+
 cast_expression:
 	OP cast_expression_disambiguation
 	| unary_expression
@@ -187,7 +232,7 @@ cast_expression:
 
 cast_expression_disambiguation:
 	type_name CP cast_expression
-	| expression CP
+	| expression CP postfix_expression_lr
 	;
 
 # 3.3.5 Multiplicative operators

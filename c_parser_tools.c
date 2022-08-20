@@ -45,15 +45,17 @@ int    c;
 	sinfo = (struct symbol_info *)nodevalue;
 
 	if(sinfo->is_token){
-		for(c=0; c<level; c++){
-			fprintf(fp," ");
+
+		for(c=0; c<level; c++) fprintf(fp," ");
+
+		switch(sinfo->id){
+			case STRING:		fprintf(fp,"\"%s\"", sinfo->str); break;
+			case CHARACTER_CONST:	fprintf(fp,"'%s'", sinfo->str); break;
+			default:		fprintf(fp,"%s", sinfo->str); break;
 		}
-		if(sinfo->id == STRING){
-			fprintf(fp,"\"%s\"", sinfo->str);
-		}else{
-			fprintf(fp,"%s", sinfo->str);
-		}
+
 		fprintf(fp,"\n");
+
 	}
 }
 
