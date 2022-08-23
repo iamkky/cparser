@@ -118,6 +118,59 @@ FILE *fp;
 	return fp;
 }
 
+// Worst possible implementation :-)
+int printCodeSnippet(xParser self)
+{
+int c, cln = 0, ch, flag = 0;
+
+	c = self->cursor < 128 ? 0 : self->cursor - 128;
+
+	cln = 0;
+	for(cln=0; c < self->cursor+128; c++){
+
+		ch = self->buffer[c];
+		if(ch==0) break;
+
+		fputc(ch, stdout);
+
+		if(self->buffer[c] == '\n') {
+			if(c<self->cursor){
+				cln = 0;
+			}else{
+				if(flag==0){
+					while(cln-->0){
+						fputc(' ', stdout);
+					}
+					fprintf(stdout,"^   just here\n");
+					flag = 1;
+				}
+			}
+		}else if(self->buffer[c] == '\t') {
+			fputs("        ", stdout);
+		}else{
+			cln++;
+		}
+		
+	}
+
+}
+
+int unexpected_handler(xParser self, int token, int nonterminal)
+{
+int size;
+
+	fprintf(stderr,"HHH: Expected: token: %d\n", token);
+	printCodeSnippet(self);
+}
+
+int backtrackFail_handler(xParser self, int nonterminal)
+{
+int size;
+
+	fprintf(stderr,"HHH: Backtracking failed:  %d\n", nonterminal);
+	printCodeSnippet(self);
+}
+
 int main(int argc, char **argv)
 {
 xParserExtraDataType	extra;
@@ -139,6 +192,9 @@ int	bytes, result;
 	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
 
 	x = xParserNew(buffer, &extra);	
+
+	xParserSetUnexpected(x, unexpected_handler);
+	xParserSetBacktrackFail(x, backtrackFail_handler);
 
 	result = xParserParse(x);
 

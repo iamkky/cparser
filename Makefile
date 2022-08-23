@@ -2,7 +2,7 @@
 NRLEX=nrlex
 RDPPGEN=rdppgen
 
-CFLAGS+=-I. -g -O2
+CFLAGS+=-I. -O2
 
 all: libcl.a cparser cprinttoken
 

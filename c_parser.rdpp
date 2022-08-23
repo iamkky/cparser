@@ -118,12 +118,21 @@ enumeration_constant:
 #                  string-literal
 #                  (  expression )
 #
+# Adaptation:
+# 	Changed to support one more just-brilliant life-changing standard-breaking
+# 	GCC feature that glibc will, for sure use, in the header files...
+#
 
 primary_expression:
 	IDENTIFIER
 	| constant
 	| STRING
-	| OP expression CP
+	| OP primary_expression_disambiguation CP
+	;
+
+primary_expression_disambiguation:
+	expression
+	| compound_statement
 	;
 
 # 3.3.2 Postfix operators
@@ -184,13 +193,18 @@ unary_expression:
 	| INC unary_expression
 	| DEV unary_expression
 	| unary_operator cast_expression
-	| SIZEOF unary_expression_disambiguation
+	| SIZEOF unary_expression_sizeof_disambiguation
 	;
 
-unary_expression_disambiguation:
-	  OP type_name CP
+unary_expression_sizeof_disambiguation:
+	  OP unary_expression_sizeof_disambiguation_2
 	| unary_expression
 	;
+
+unary_expression_sizeof_disambiguation_2:
+	 type_name CP
+	| expression CP postfix_expression_lr
+	; 
 
 unary_operator:
 	  AMPERSAND
