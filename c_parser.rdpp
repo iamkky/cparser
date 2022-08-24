@@ -833,7 +833,7 @@ declarator_opt:
 
 initializer:
 	assignment_expression
-	| OB initializer_list initializer_list_comma_opt CB
+	| OBLOCK initializer_list initializer_list_comma_opt CBLOCK
 	;
 
 initializer_list_comma_opt:
