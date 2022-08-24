@@ -19,7 +19,7 @@ struct options {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	NULL
 };
 
 char *readToBuffer(int fd, int inisize, int extrasize, int *readsize)
