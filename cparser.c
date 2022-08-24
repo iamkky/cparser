@@ -7,6 +7,7 @@
 #include "Tree.h"
 #include "TreeIterator.h"
 #include "c_parser.h"
+#include "c_parser.tokens.h"
 #include "c_parser_tools.h"
 
 struct options {
@@ -141,7 +142,7 @@ int c, cln = 0, ch, flag = 0;
 					while(cln-->0){
 						fputc(' ', stdout);
 					}
-					fprintf(stdout,"^   just here\n");
+					fprintf(stdout,"^   Cursor is here\n");
 					flag = 1;
 				}
 			}
@@ -160,15 +161,13 @@ int unexpected_handler(xParser self, int token, int nonterminal)
 int size;
 
 	fprintf(stderr,"HHH: Expected: token: %d\n", token);
-	printCodeSnippet(self);
 }
 
 int backtrackFail_handler(xParser self, int nonterminal)
 {
 int size;
 
-	fprintf(stderr,"HHH: Backtracking failed:  %d\n", nonterminal);
-	printCodeSnippet(self);
+	fprintf(stderr,"HHH: Backtracking failed:  %d (%s)\n", nonterminal, Rdpp_xParserNonterminals_Names[nonterminal-10000]);
 }
 
 int main(int argc, char **argv)
@@ -226,7 +225,11 @@ int	bytes, result;
 			fclose(fp_code);
 		}
 	}else{
-		fprintf(stderr,"Failed to parse!\n");
+		fprintf(stdout,"Error: Failed to parse!\n");
+		fprintf(stdout,"Code begin\n");
+		printCodeSnippet(x);
+		fprintf(stdout,"\n");
+		fprintf(stdout,"Code end\n");
 		exit(-1);
 	}
 	

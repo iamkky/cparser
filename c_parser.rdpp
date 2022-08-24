@@ -127,10 +127,10 @@ primary_expression:
 	IDENTIFIER
 	| constant
 	| STRING
-	| OP primary_expression_disambiguation CP
+	| OP primary_expression_gcc_extension CP
 	;
 
-primary_expression_disambiguation:
+primary_expression_gcc_extension:
 	expression
 	| compound_statement
 	;
@@ -246,7 +246,7 @@ cast_expression:
 
 cast_expression_disambiguation:
 	type_name CP cast_expression
-	| expression CP postfix_expression_lr
+	| primary_expression_gcc_extension CP postfix_expression_lr
 	;
 
 # 3.3.5 Multiplicative operators
