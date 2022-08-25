@@ -13,9 +13,11 @@
 #include "c_parser.tokens.h"
 #include "c_lex.h"
 
-//#define DDEBUG 1
-//#define TOKENDEBUG 1
-//#define RETURNDEBUG 1
+#ifdef DEBUGALL
+#define DDEBUG 1
+#define TOKENDEBUG 1
+#define RETURNDEBUG 1
+#endif
 
 #define _ddebug_printf _ddprintf
 
@@ -847,6 +849,14 @@ initializer_list:
 
 
 # 3.6 STATEMENTS
+#           statement:
+#                   labeled-statement
+#                   compound-statement
+#                   expression-statement
+#                   selection-statement
+#                   iteration-statement
+#                   jump-statement
+
 
 statement:
 	labeled_statement
@@ -866,13 +876,37 @@ statement:
 #
 #
 # Adaptations:
-#   rule starting with IDENTIFIER conflicts with statement.
-#   parser needs to look ahead second token to disambiguate
-#   rdppgen does not perform look ahead.
-#   A diffetente solution need to be done
+#   rules starting with IDENTIFIER conflicts with statement.
+#   parser needs to look ahead second token to disambiguate between labeled-statement
+#   and expression
+#
+#   rdppgen does not perform look ahead, neither backtracking
+#   A different solution need to be done...
+#
+#   And in the end of the day the diferent solution become something
+#   like a poor man handmade single character lookahead :-)
+#
+#   but, it works...
+#
 
 labeled_statement:
-	CASE constant_expression COLON statement
+	{ 
+		int c;
+
+		// if current token is not an IDENTIFIER go to next production rule
+		if(!checkToken(self, IDENTIFIER)) break;
+
+		// If it is, go find next no-blank (' ','\t') character.
+		c = self->cursor;
+		while(*(self->buffer+c) == ' ' || *(self->buffer+c) == '\t') c++;
+
+		// If there is no COMMA after IDENTIFIER, break to next production
+		if(*(self->buffer+c) != ':') break;
+
+		// If there is a COMMA, follow with this production rule
+	}
+	  IDENTIFIER COLON statement
+	| CASE constant_expression COLON statement
 	| DEFAULT COLON statement
 	;
 
