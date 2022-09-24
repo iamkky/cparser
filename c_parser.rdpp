@@ -835,16 +835,21 @@ declarator_opt:
 
 initializer:
 	assignment_expression
-	| OBLOCK initializer_list initializer_list_comma_opt CBLOCK
-	;
-
-initializer_list_comma_opt:
-	COMMA
-	|
+	| initializer_list
 	;
 
 initializer_list:
-	initializer [ COMMA initializer ]
+	OBLOCK initializer initializer_list_disambiguation
+	;
+
+initializer_list_disambiguation:
+	CBLOCK
+	| COMMA initializer_list_disambiguation2
+	;
+
+initializer_list_disambiguation2:
+	CBLOCK
+	| initializer initializer_list_disambiguation
 	;
 
 
