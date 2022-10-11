@@ -620,12 +620,12 @@ enum_specifier:
 	;
 
 enum_specifier_disambiguation:
-	OBLOCK enumerator_list CBLOCK
-	| IDENTIFIER  enum_specifier_disambiguation2
+	IDENTIFIER enum_specifier_disambiguation2
+	| enumerator_list
 	;
 
 enum_specifier_disambiguation2:
-	OBLOCK enumerator_list CBLOCK
+	enumerator_list
 	|
 	;
 
@@ -635,7 +635,17 @@ enum_specifier_disambiguation2:
 #	;
 
 enumerator_list:
-	enumerator [ COMMA enumerator ]
+	OBLOCK enumerator enumerator_list_disambiguation
+	;
+
+enumerator_list_disambiguation:
+	CBLOCK
+	| COMMA enumerator_list_disambiguation2
+	;
+
+enumerator_list_disambiguation2:
+	CBLOCK
+	| enumerator enumerator_list_disambiguation
 	;
 
 #enumerator:
