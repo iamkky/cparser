@@ -61,6 +61,7 @@ static struct keyword keywords[] = {
 	{"restrict",	RESTRICT},	// C99 restrict
 	{"__restrict",	RESTRICT},	// GNU restrict
 	{"__restrict__",RESTRICT},	// GNU restrict
+	{"__builtin_va_arg",	BUILTIN_VA_ARG},	// GNU built_in
 	{NULL,		0}
 };
 

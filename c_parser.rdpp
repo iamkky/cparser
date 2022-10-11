@@ -130,6 +130,7 @@ primary_expression:
 	| constant
 	| STRING
 	| OP primary_expression_gcc_extension CP
+	| BUILTIN_VA_ARG OP assignment_expression COMMA type_name CP
 	;
 
 primary_expression_gcc_extension:
