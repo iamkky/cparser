@@ -75,6 +75,18 @@ static void missingParameter(char *option)
 	exit(-1);
 }
 
+void usage(int argc, char **argv)
+{
+	fprintf(stdout,"Usage:\n");
+	fprintf(stdout," %s [-h] [-c file] [-t file] [-r file] [-s file]\n", argv[0]);
+	fprintf(stdout,"\n");
+	fprintf(stdout,"  -c file:  Output reconstructed file\n");
+	fprintf(stdout,"  -t file:  Output parser tree\n");
+	fprintf(stdout,"  -r file:  Output reduced parser tree\n");
+	fprintf(stdout,"  -s file:  Output symbol table\n");
+	fprintf(stdout,"  -h:       Prints usage\n");
+}
+
 int get_options(int argc, char **argv, struct options *options)
 {
 int argcount = 1;
@@ -99,6 +111,10 @@ int argcount = 1;
 			if(++argcount==argc) missingParameter("-s");
 			options->symbols_filename = argv[argcount++];
 			continue;
+		}
+		if(!strcmp(argv[argcount], "-h")){
+			usage(argc, argv);
+			exit(0);
 		}
 		fprintf(stderr,"know command line parameter: %s\n", argv[argcount]);
 		exit(-1);
@@ -188,7 +204,7 @@ int	bytes, result;
 	extra.level = 0;
 	extra.file = strdup("<stdin>");
 
-	symbolTableRegister(extra.syms, "__builtin_va_list", 1);
+	symbolTableRegister(extra.syms, "__builtin_va_list", 1, 0);
 
 	x = xParserNew(buffer, &extra);	
 
