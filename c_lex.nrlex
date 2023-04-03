@@ -185,7 +185,7 @@ int	isTypedef;
 	}
 	
 	if(((xParserExtraDataType *)extra)->struct_or_union_name_escope == 0){
-		if(isTypedef = symbolTableGetType(((xParserExtraDataType *)extra)->syms, str)){
+		if(symbolTableGetSymbolType(((xParserExtraDataType *)extra)->syms, str) == SYMBOL_TYPEDEFNAME){
 //			fprintf(stderr,"Typedef detected: %s\n", str);
 			return TYPEDEF_NAME;
 		}

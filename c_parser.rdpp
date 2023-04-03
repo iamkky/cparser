@@ -91,6 +91,8 @@ struct {
 		int		level;
 		char		*file;
 		int		lnumber;
+
+		int		current_symbol_index;
 	}
 }
 
@@ -445,7 +447,7 @@ constant_expression:
 declaration:
 	{typedefFlag = 0;}
 	declaration_specifiers
-		{ if(terms[0].st_class==TYPEDEFNAME) typedefFlag = 1; else typedefFlag = 0; }
+		{ if(terms[0].st_class==SYMBOL_TYPEDEFNAME) typedefFlag = 1; else typedefFlag = 0; }
 		init_declarator_list_opt function_definition_or_declaration_complement
 	;
 
@@ -499,7 +501,7 @@ string_literal:
 #3.5.1 Storage-class specifiers
 
 storage_class_specifier:
-	  TYPEDEF { result.st_class = TYPEDEFNAME; }
+	  TYPEDEF { result.st_class = SYMBOL_TYPEDEFNAME; }
 	| EXTERN
 	| STATIC
 	| AUTO
@@ -757,8 +759,12 @@ direct_or_abstract_declarator:
 	IDENTIFIER 			
 		{ 
 			if(typedefFlag){
-				symbolTableRegister((self->extra)->syms, terms[0].info.str, 1);
+				self->extra->current_symbol_index = 
+				symbolTableRegister((self->extra)->syms, terms[0].info.str, 1, self->extra->level);
 				typedefFlag = 0;
+			}else{
+				self->extra->current_symbol_index = 
+				symbolTableRegister((self->extra)->syms, terms[0].info.str, 2, self->extra->level);
 			}
 		}
 		[ direct_declarator_postfix_options ]

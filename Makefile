@@ -6,11 +6,11 @@ CFLAGS+=-I. -O2
 
 all: libcl.a cparser cprinttoken
 
-cparser: cparser.o Tree.o TreeIterator.o Symbol.o libcl.a
-	$(CC) $(CFLAGS) -o cparser cparser.o Tree.o TreeIterator.o Symbol.o libcl.a
+cparser: cparser.o Tree.o TreeIterator.o Symbol.o Type.o libcl.a
+	$(CC) $(CFLAGS) -o cparser $^
 
-cprinttoken: cprinttoken.o Tree.o TreeIterator.o Symbol.o libcl.a
-	$(CC) $(CFLAGS) -o cprinttoken cprinttoken.o Tree.o TreeIterator.o Symbol.o libcl.a
+cprinttoken: cprinttoken.o Tree.o TreeIterator.o Symbol.o Type.o libcl.a
+	$(CC) $(CFLAGS) -o cprinttoken $^
 
 libcl.a: c_lex.nrlex c_parser.rdpp common.o c_parser_tools.c
 	$(RDPPGEN) c_parser.rdpp
