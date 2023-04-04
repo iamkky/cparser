@@ -69,6 +69,8 @@ static int typedefFlag = 0;
 struct {
 	Tree	t;
 	int	st_class;
+	int	type;
+	int	primitive_subtype;
 
 	struct symbol_info {
 		int	is_token;
@@ -445,10 +447,14 @@ constant_expression:
 #   Included simples-asm-expr from GNU to support glibc header files
 
 declaration:
-	{typedefFlag = 0;}
+	{
+		typedefFlag = 0;
+	}
 	declaration_specifiers
 		{ if(terms[0].st_class==SYMBOL_TYPEDEFNAME) typedefFlag = 1; else typedefFlag = 0; }
-		init_declarator_list_opt function_definition_or_declaration_complement
+	   init_declarator_list_opt function_definition_or_declaration_complement
+			{ fprintf(stdout," PRIMITIVE %d ", terms[0].primitive_subtype);
+			  fprintf(stdout," END OF DECLARATION\n"); }
 	;
 
 function_definition_or_declaration_complement:
@@ -457,13 +463,19 @@ function_definition_or_declaration_complement:
 	;
 
 declaration_specifiers:
-	declaration_specifier { result.st_class = terms[0].st_class; } [ declaration_specifier { result.st_class |= terms[1].st_class; } ]
+	declaration_specifier
+			{ result.st_class = terms[0].st_class;
+			  result.primitive_subtype = terms[0].primitive_subtype; }
+	  [ declaration_specifier
+			{ result.st_class |= terms[1].st_class;
+			  result.primitive_subtype = terms[0].primitive_subtype; }
+	  ]
 	;
 
 declaration_specifier:
 	storage_class_specifier { result.st_class = terms[0].st_class; }
 	| type_specifier { result.st_class = terms[0].st_class; }
-	| type_qualifier { result.st_class = terms[0].st_class; }
+	| type_qualifier { result.st_class = terms[0].st_class; result.primitive_subtype = terms[0].primitive_subtype; }
 	| function_specifier { result.st_class = terms[0].st_class; }   # c99 inline
 	;
 
@@ -512,11 +524,11 @@ storage_class_specifier:
 
 type_specifier:
 	  VOID
-	| CHAR
+	| CHAR     { result.primitive_subtype = PSTYPE_CHAR; } 
 	| SHORT
-	| INT
+	| INT      { result.primitive_subtype = PSTYPE_INT; } 
 	| LONG
-	| FLOAT
+	| FLOAT    { result.primitive_subtype = PSTYPE_FLOAT; } 
 	| DOUBLE
 	| SIGNED
 	| UNSIGNED
@@ -753,6 +765,7 @@ type_qualifier:
 
 declarator:
 	pointer_opt direct_or_abstract_declarator
+		{ if(terms[0].type == TYPE_POINTER) fprintf(stdout, "POINTER TO "); }
 	;
 
 direct_or_abstract_declarator:
@@ -766,6 +779,8 @@ direct_or_abstract_declarator:
 				self->extra->current_symbol_index = 
 				symbolTableRegister((self->extra)->syms, terms[0].info.str, 2, self->extra->level);
 			}
+
+			{ fprintf(stdout, "IDENTIFIER %s ", terms[0].info.str); }
 		}
 		[ direct_declarator_postfix_options ]
 	| OP parameter_type_list_or_declarator CP [ direct_declarator_postfix_options ]
@@ -781,11 +796,12 @@ parameter_type_list_or_declarator:
 
 direct_declarator_postfix_options:
 	  OB constant_expression_opt CB 
+		{ fprintf(stdout, "ARRAY OF "); }
 	| OP parameter_type_list_opt CP
 	;
 
 pointer_opt:	
-	pointer
+	pointer { result.type = TYPE_POINTER; }
 	|
 	;
 

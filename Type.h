@@ -1,8 +1,8 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
-enum basic_types {TYPE_PRIMITE, TYPE_ARRAY, TYPE_POINTER};
-enum primitive_subtypes {PSTYPE_INT, PSTYPE_FLOAT, PSTYPE_CHAR};
+enum basic_types {TYPE_PRIMITE=1, TYPE_ARRAY, TYPE_POINTER};
+enum primitive_subtypes {PSTYPE_INT=1, PSTYPE_FLOAT, PSTYPE_CHAR};
 
 typedef struct type *Type;
 
